@@ -322,7 +322,7 @@ class TestOCSVM_PLUS(unittest.TestCase):
         X_star = X[:, [1]]
         X = X[:, [0]]
 
-        nu = 0.5
+        nu = 0.5012345
         tau = 1e-4
 
         if LOG:

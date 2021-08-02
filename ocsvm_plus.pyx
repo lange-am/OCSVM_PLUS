@@ -481,6 +481,7 @@ cdef class OCSVM_PLUS_C:
     cdef int alg
     cdef int last_f_recalculate_level
     cdef int max_iter
+    cdef object logger
 
     def __init__(self, DTYPE_t nu, DTYPE_t gamma, DTYPE_t tau, 
                  kernel K = kernel_linear(),
@@ -534,13 +535,15 @@ cdef class OCSVM_PLUS_C:
             self.logging_file_name = logging_file_name
             handler = logging.FileHandler(self.logging_file_name, 'w', 'utf-8')
             handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
-            logger=logging.getLogger()
-            for h in logger.handlers:
-                logger.removeHandler(h)
-            logger.setLevel(logging.DEBUG)
-            logger.addHandler(handler)
+            self.logger=logging.getLogger()
+            for h in self.logger.handlers:
+                h.close()
+                self.logger.removeHandler(h)
+            self.logger.setLevel(logging.DEBUG)
+            self.logger.addHandler(handler)
         else:
             self.logging = False
+            self.logger = None
             self.logging_file_name = self.__class__.__name__
 
     @cython.boundscheck(False)  # turn off bounds-checking for entire function
@@ -574,15 +577,18 @@ cdef class OCSVM_PLUS_C:
         self.coeffs = AlphasDeltas(self.n_samples)
         cdef int[::1] ii_a
         cdef int[::1] ii_d
+        cdef int l
         if self.nu_nsamples.is_integer():
-            ii_a = np.random.choice(range(self.n_samples), int(self.nu_nsamples), replace=False).astype(ITYPE)
-            ii_d = np.random.choice(range(self.n_samples), int(self.nu_nsamples), replace=False).astype(ITYPE)
+            l = int(self.nu_nsamples)
+            ii_a = np.random.choice(range(self.n_samples), l, replace=False).astype(ITYPE)
+            ii_d = np.random.choice(range(self.n_samples), l, replace=False).astype(ITYPE)
         else:
-            ii_a = np.random.choice(range(self.n_samples), int(self.nu_nsamples)+1, replace=False).astype(ITYPE)
-            ii_d = np.random.choice(range(self.n_samples), int(self.nu_nsamples)+1, replace=False).astype(ITYPE)
-            self.coeffs.set_anot0_c(ii_a[-1], self.nu_nsamples-int(self.nu_nsamples))
-            self.coeffs.set_dnot01_c(ii_d[-1], self.nu_nsamples-int(self.nu_nsamples))
-            ii_a, ii_d = ii_a[:-1], ii_d[:-1]
+            l = int(self.nu_nsamples) + 1
+            ii_a = np.random.choice(range(self.n_samples), l, replace=False).astype(ITYPE)
+            ii_d = np.random.choice(range(self.n_samples), l, replace=False).astype(ITYPE)
+            self.coeffs.set_anot0_c(ii_a[l-1], self.nu_nsamples-int(self.nu_nsamples))
+            self.coeffs.set_dnot01_c(ii_d[l-1], self.nu_nsamples-int(self.nu_nsamples))
+            ii_a, ii_d = ii_a[:l-1], ii_d[:l-1]
 
         cdef Py_ssize_t i
         for i in range(ii_a.shape[0]):
@@ -1557,6 +1563,7 @@ class OCSVM_PLUS(BaseEstimator):
         self.logging_file_name = logging_file_name
         self.max_iter = max_iter
         self.is_fitted_ = False
+        self.model_ = None
 
     def fit(self, X, X_star):
         if not (self.nu > 0 and self.nu < 1):
