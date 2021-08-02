@@ -70,10 +70,10 @@ class ocsvm_plus.OCSVM_PLUS(kernel='rbf', kernel_gamma='scale',
 
 |**Methods:**                  |**Description**|
 | :-------                     | :-------      |
-|`fit(X, X_star)`              | Detects the soft boundary of the set of samples `X[n_samples, n_features]` accounting for privileged `X_star[n_samples, n_features_star]`. `X` and `X_star` are array-like, if not C-ordered contiguous arrays they are copied. Returns `self`.|
-|`decision_function(X)`        | Signed distance to the separating hyperplane in original feature space, positive for an inlier and negative for an outlier points. `X` is array-like of shape (`n_samples_test, n_features`), if not C-ordered contiguous array it is copied. Returns `ndarray` of shape (`n_samples_test, `). |
-|`correcting_function(X_star)` | Slack variables modelled using privileged features. `X_star` is array-like of shape (`n_samples_test, n_features_star`), if not C-ordered contiguous array it is copied. Returns `ndarray` of shape (`n_samples_test, `). |
-|`predict(X)`                 | Perform classification on samples in `X`. Similar to `decision_function(X)`, but the output is +1 if decision function is positive and -1 if negative.|
+|`fit(Xall[, y=None])`         | Detects the soft boundary of the set of original vectors `X[n_samples, n_features]` accounting for privileged vectors `X_star[n_samples, n_features_star]`, where `Xall=[n_samples, n_features + n_features_star]` comprises `X` in the first `n_features` columns and `X_star` in the last `n_features_star` columns. `Xall` is array-like, if not C-ordered contiguous array it is copied. Returns `self`.|
+|`decision_function(X)`        | Signed distance to the separating hyperplane in original feature space, positive for an inlier and negative for an outlier points. `X` is array-like, first `n_features` columns are used, others are ignored. Returns `ndarray` of shape `(X.shape[0], )`. |
+|`correcting_function(X_star)` | Slack variables modelled using privileged features. `X_star` is array-like, last `n_features_star` columns are used as privileged vectors, others are ignored. Returns `ndarray` of shape `(X_star.shape[0], )`. |
+|`predict(X)`                 | Perform classification on samples in `X`. Similar to `decision_function(X)`, but the output is +1 if the decision function is positive and -1 otherwise.|
 
 ## Examples
 
