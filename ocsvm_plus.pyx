@@ -461,12 +461,11 @@ cdef class OCSVM_PLUS_C:
     cdef readonly Py_ssize_t kii_ij_jj_cache_size
     cdef readonly object random_seed
     cdef readonly Py_ssize_t n_samples
-    cdef readonly Py_ssize_t n_features, n_features_star    
+    cdef readonly Py_ssize_t n_features, n_features_star, n_features_total    
     cdef readonly AlphasDeltas coeffs
     cdef readonly DTYPE_t[::1] f
     cdef readonly DTYPE_t[::1] f_star
     cdef DTYPE_t[:, ::1] X
-    cdef DTYPE_t[:, ::1] X_star
     cdef DTYPE_t nu_nsamples
     cdef readonly int anot0_dnot01
     cdef readonly int anot0_d0
@@ -483,7 +482,7 @@ cdef class OCSVM_PLUS_C:
     cdef int max_iter
     cdef object logger
 
-    def __init__(self, DTYPE_t nu, DTYPE_t gamma, DTYPE_t tau, 
+    def __init__(self, int n_features, DTYPE_t nu, DTYPE_t gamma, DTYPE_t tau, 
                  kernel K = kernel_linear(),
                  kernel K_star = kernel_linear(),
                  object random_seed = None,
@@ -495,6 +494,7 @@ cdef class OCSVM_PLUS_C:
                  logging_file_name=None):
         if nu <= 0.0 or nu >= 1.0:
             raise ValueError("must be 0<\nu <1!")
+        self.n_features = n_features
         self.nu = nu
         self.gamma = gamma
         self.tau = tau
@@ -516,10 +516,9 @@ cdef class OCSVM_PLUS_C:
         self.f = None
         self.f_star = None
         self.X = None
-        self.X_star = None
         self.n_samples = 0
-        self.n_features = 0
         self.n_features_star = 0
+        self.n_features_total = 0
         self.nu_nsamples = 0
         self.coeffs = None
         self.rho = NP_NAN
@@ -527,6 +526,7 @@ cdef class OCSVM_PLUS_C:
         self.alg = alg
         self.max_iter = max_iter
         self.last_f_recalculate_level = NONE_ELEM_LEVEL
+
         if self.random_seed is not None:
             np.random.seed(self.random_seed)
 
@@ -548,17 +548,19 @@ cdef class OCSVM_PLUS_C:
 
     @cython.boundscheck(False)  # turn off bounds-checking for entire function
     @cython.wraparound(False)   # turn off negative index wrapping for entire function
-    cdef initialize_c(self, cnp.ndarray[DTYPE_t, ndim=2] X, cnp.ndarray[DTYPE_t, ndim=2] X_star):
+    cdef initialize_c(self, cnp.ndarray[DTYPE_t, ndim=2] X):
         IF DEBUG:
             if self.logging:
                 logging.debug('initialize_c')
 
         self.X = X
-        self.X_star = X_star
         self.n_samples = X.shape[0]
-        self.n_features = X.shape[1]
-        self.n_features_star = X_star.shape[1]
         self.nu_nsamples = self.nu * self.n_samples
+
+        self.n_features_total = X.shape[1]
+        self.n_features_star = self.n_features_total - self.n_features
+        if self.n_features_star < 1:
+            raise ValueError("not enough features in X!")
 
         if self.k_cache_size:
             self.kmK = KernelSetManager(self.kerK, self.k_cache_size)
@@ -605,22 +607,22 @@ cdef class OCSVM_PLUS_C:
         cdef Py_ssize_t k        
         if self.anot0_dnot01 == ff_cache_level:
             for k in self.coeffs.anot0_dnot01:
-                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features, k)
+                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)
         if self.anot0_d0 == ff_cache_level:
             for k in self.coeffs.anot0_d0:
-                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features, k)
+                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)
         if self.anot0_d1 == ff_cache_level:
             for k in self.coeffs.anot0_d1:
-                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features, k)
+                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)
         if self.a0_dnot01 == ff_cache_level:
             for k in self.coeffs.a0_dnot01:
-                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features, k)
+                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)
         if self.a0_d1 == ff_cache_level:
             for k in self.coeffs.a0_d1:
-                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features, k)
+                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)
         if self.a0_d0 == ff_cache_level:
             for k in self.coeffs.a0_d0:
-                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features, k)
+                self.f[k] = self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)
 
         self.last_f_recalculate_level = ff_cache_level
 
@@ -628,22 +630,22 @@ cdef class OCSVM_PLUS_C:
         cdef Py_ssize_t k
         if self.anot0_dnot01 == ff_cache_level:
             for k in self.coeffs.anot0_dnot01:
-                self.f_star[k] = self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)
+                self.f_star[k] = self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)
         if self.anot0_d0 == ff_cache_level:
             for k in self.coeffs.anot0_d0:
-                self.f_star[k] = self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)
+                self.f_star[k] = self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)
         if self.anot0_d1 == ff_cache_level:
             for k in self.coeffs.anot0_d1:
-                self.f_star[k] = self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)
+                self.f_star[k] = self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)
         if self.a0_dnot01 == ff_cache_level:
             for k in self.coeffs.a0_dnot01:
-                self.f_star[k] = self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)
+                self.f_star[k] = self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)
         if self.a0_d1 == ff_cache_level:
             for k in self.coeffs.a0_d1:
-                self.f_star[k] = self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)
+                self.f_star[k] = self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)
         if self.a0_d0 == ff_cache_level:
             for k in self.coeffs.a0_d0:
-                self.f_star[k] = self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)
+                self.f_star[k] = self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)
 
     cdef initialize_ff_c(self):
         IF DEBUG:
@@ -668,11 +670,11 @@ cdef class OCSVM_PLUS_C:
         cdef Py_ssize_t k
         cdef DTYPE_t s = 0.0
         for k in self.coeffs.anot0_d0:
-            s += self.coeffs.a[k] * self.kmK.get_c(x, &self.X[0, 0]+k*self.n_features, self.n_features, i, k)
+            s += self.coeffs.a[k] * self.kmK.get_c(x, &self.X[0, 0]+k*self.n_features_total, self.n_features, i, k)
         for k in self.coeffs.anot0_dnot01:
-            s += self.coeffs.a[k] * self.kmK.get_c(x, &self.X[0, 0]+k*self.n_features, self.n_features, i, k)
+            s += self.coeffs.a[k] * self.kmK.get_c(x, &self.X[0, 0]+k*self.n_features_total, self.n_features, i, k)
         for k in self.coeffs.anot0_d1:
-            s += self.coeffs.a[k] * self.kmK.get_c(x, &self.X[0, 0]+k*self.n_features, self.n_features, i, k)
+            s += self.coeffs.a[k] * self.kmK.get_c(x, &self.X[0, 0]+k*self.n_features_total, self.n_features, i, k)
         return s/self.nu_nsamples
 
 
@@ -682,15 +684,15 @@ cdef class OCSVM_PLUS_C:
         cdef Py_ssize_t k        
         cdef DTYPE_t s = 0.0
         for k in self.coeffs.anot0_d0:
-            s += self.coeffs.a[k]                      * self.kmK_star.get_c(x_star, &self.X_star[0, 0]+k*self.n_features_star, self.n_features_star, i, k)
+            s += self.coeffs.a[k]                      * self.kmK_star.get_c(x_star, &self.X[0, 0]+k*self.n_features_total+self.n_features, self.n_features_star, i, k)
         for k in self.coeffs.anot0_dnot01:
-            s += (self.coeffs.a[k] - self.coeffs.d[k]) * self.kmK_star.get_c(x_star, &self.X_star[0, 0]+k*self.n_features_star, self.n_features_star, i, k)
+            s += (self.coeffs.a[k] - self.coeffs.d[k]) * self.kmK_star.get_c(x_star, &self.X[0, 0]+k*self.n_features_total+self.n_features, self.n_features_star, i, k)
         for k in self.coeffs.anot0_d1:
-            s += (self.coeffs.a[k] - 1.0)              * self.kmK_star.get_c(x_star, &self.X_star[0, 0]+k*self.n_features_star, self.n_features_star, i, k)
+            s += (self.coeffs.a[k] - 1.0)              * self.kmK_star.get_c(x_star, &self.X[0, 0]+k*self.n_features_total+self.n_features, self.n_features_star, i, k)
         for k in self.coeffs.a0_dnot01:
-            s += - self.coeffs.d[k]                    * self.kmK_star.get_c(x_star, &self.X_star[0, 0]+k*self.n_features_star, self.n_features_star, i, k)
+            s += - self.coeffs.d[k]                    * self.kmK_star.get_c(x_star, &self.X[0, 0]+k*self.n_features_total+self.n_features, self.n_features_star, i, k)
         for k in self.coeffs.a0_d1:
-            s += -                                       self.kmK_star.get_c(x_star, &self.X_star[0, 0]+k*self.n_features_star, self.n_features_star, i, k)
+            s += -                                       self.kmK_star.get_c(x_star, &self.X[0, 0]+k*self.n_features_total+self.n_features, self.n_features_star, i, k)
         return s/self.gamma
 
 
@@ -830,9 +832,9 @@ cdef class OCSVM_PLUS_C:
 
 
     cdef update_f_c(self, Py_ssize_t i, Py_ssize_t j, Py_ssize_t k, DTYPE_t t):
-        cdef DTYPE_t* x_i = &self.X[0, 0]+i*self.n_features
-        cdef DTYPE_t* x_j = &self.X[0, 0]+j*self.n_features
-        cdef DTYPE_t* x_k = &self.X[0, 0]+k*self.n_features
+        cdef DTYPE_t* x_i = &self.X[0, 0]+i*self.n_features_total
+        cdef DTYPE_t* x_j = &self.X[0, 0]+j*self.n_features_total
+        cdef DTYPE_t* x_k = &self.X[0, 0]+k*self.n_features_total
 
         cdef DTYPE_t K1 = self.kmK.get_c(x_i, x_k, self.n_features, i, k)
         cdef DTYPE_t K2 = self.kmK.get_c(x_j, x_k, self.n_features, j, k)
@@ -840,9 +842,9 @@ cdef class OCSVM_PLUS_C:
 
 
     cdef update_f_star_c(self, Py_ssize_t m, Py_ssize_t n, Py_ssize_t k, DTYPE_t s):
-        cdef DTYPE_t* x_m = &self.X_star[0, 0]+m*self.n_features_star
-        cdef DTYPE_t* x_n = &self.X_star[0, 0]+n*self.n_features_star
-        cdef DTYPE_t* x_k = &self.X_star[0, 0]+k*self.n_features_star
+        cdef DTYPE_t* x_m = &self.X[0, 0]+m*self.n_features_total+self.n_features
+        cdef DTYPE_t* x_n = &self.X[0, 0]+n*self.n_features_total+self.n_features
+        cdef DTYPE_t* x_k = &self.X[0, 0]+k*self.n_features_total+self.n_features
 
         cdef DTYPE_t K1 = self.kmK_star.get_c(x_m, x_k, self.n_features_star, m, k)
         cdef DTYPE_t K2 = self.kmK_star.get_c(x_n, x_k, self.n_features_star, n, k)
@@ -892,12 +894,12 @@ cdef class OCSVM_PLUS_C:
 
 
     cdef alpha_step_c(self, Py_ssize_t i, Py_ssize_t j):
-        cdef DTYPE_t* x_i = &self.X[0, 0]+i*self.n_features
-        cdef DTYPE_t* x_j = &self.X[0, 0]+j*self.n_features
+        cdef DTYPE_t* x_i = &self.X[0, 0]+i*self.n_features_total
+        cdef DTYPE_t* x_j = &self.X[0, 0]+j*self.n_features_total
         cdef DTYPE_t Kij = self.kmKij.get_c(x_i, x_j, self.n_features, i, j)
 
-        x_i = &self.X_star[0, 0]+i*self.n_features_star
-        x_j = &self.X_star[0, 0]+j*self.n_features_star
+        x_i = &self.X[0, 0]+i*self.n_features_total+self.n_features
+        x_j = &self.X[0, 0]+j*self.n_features_total+self.n_features
         cdef DTYPE_t Kij_star = self.kmKij_star.get_c(x_i, x_j, self.n_features_star, i, j)
         cdef DTYPE_t Delta_f_sum = self.f[i] + self.f_star[i] - self.f[j] - self.f_star[j]
         cdef DTYPE_t t = - Delta_f_sum / (Kij + Kij_star)
@@ -925,7 +927,6 @@ cdef class OCSVM_PLUS_C:
         IF DEBUG:
             self.check_ff_update_c()
 
-
     cdef int get_ff_cache_level(self, Py_ssize_t k):
         if self.coeffs.ais0[k]:
             if self.coeffs.dis0[k]:
@@ -942,10 +943,9 @@ cdef class OCSVM_PLUS_C:
             else:
                 return self.anot0_dnot01
 
-
     cdef delta_step_c(self, Py_ssize_t m, Py_ssize_t n):
-        cdef DTYPE_t* x_m = &self.X_star[0, 0]+m*self.n_features_star
-        cdef DTYPE_t* x_n = &self.X_star[0, 0]+n*self.n_features_star
+        cdef DTYPE_t* x_m = &self.X[0, 0]+m*self.n_features_total + self.n_features
+        cdef DTYPE_t* x_n = &self.X[0, 0]+n*self.n_features_total + self.n_features
         cdef DTYPE_t Kmn_star = self.kmKij_star.get_c(x_m, x_n, self.n_features_star, m, n)
         cdef DTYPE_t Delta_f_star = self.f_star[m] - self.f_star[n]
         cdef DTYPE_t s = Delta_f_star / Kmn_star
@@ -992,9 +992,9 @@ cdef class OCSVM_PLUS_C:
 
         # recalcuate f_n, f_m if m or n moved to C cache
         if self.get_ff_cache_level(m) == C_CACHE_LEVEL and not m_in_C:
-            self.f[m] = self.get_f_c(&self.X[0, 0]+m*self.n_features, m)
+            self.f[m] = self.get_f_c(&self.X[0, 0]+m*self.n_features_total, m)
         if self.get_ff_cache_level(n) == C_CACHE_LEVEL and not n_in_C:
-            self.f[n] = self.get_f_c(&self.X[0, 0]+n*self.n_features, n)
+            self.f[n] = self.get_f_c(&self.X[0, 0]+n*self.n_features_total, n)
 
         self.last_f_recalculate_level = NONE_ELEM_LEVEL
 
@@ -1007,50 +1007,50 @@ cdef class OCSVM_PLUS_C:
             cdef Py_ssize_t k
             if self.anot0_dnot01 == C_CACHE_LEVEL:
                 for k in self.coeffs.anot0_dnot01:
-                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)) < DTYPE_CMP_TOL)
             if self.anot0_d0 == C_CACHE_LEVEL:
                 for k in self.coeffs.anot0_d0:
-                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)) < DTYPE_CMP_TOL)
             if self.anot0_d1 == C_CACHE_LEVEL:
                 for k in self.coeffs.anot0_d1:
-                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)) < DTYPE_CMP_TOL)
             if self.a0_dnot01 == C_CACHE_LEVEL:
                 for k in self.coeffs.a0_dnot01:
-                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)) < DTYPE_CMP_TOL)
             if self.a0_d1 == C_CACHE_LEVEL:
                 for k in self.coeffs.a0_d1:
-                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)) < DTYPE_CMP_TOL)
             if self.a0_d0 == C_CACHE_LEVEL:
                 for k in self.coeffs.a0_d0:
-                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f[k] - self.get_f_c(&self.X[0, 0]+k*self.n_features_total, k)) < DTYPE_CMP_TOL)
 
             if self.anot0_dnot01 == C_STAR_CACHE_LEVEL:
                 for k in self.coeffs.anot0_dnot01:
-                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)) < DTYPE_CMP_TOL)
             if self.anot0_d0 == C_STAR_CACHE_LEVEL:
                 for k in self.coeffs.anot0_d0:
-                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)) < DTYPE_CMP_TOL)
             if self.anot0_d1 == C_STAR_CACHE_LEVEL:
                 for k in self.coeffs.anot0_d1:
-                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)) < DTYPE_CMP_TOL)
             if self.a0_dnot01 == C_STAR_CACHE_LEVEL:
                 for k in self.coeffs.a0_dnot01:
-                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)) < DTYPE_CMP_TOL)
             if self.a0_d1 == C_STAR_CACHE_LEVEL:
                 for k in self.coeffs.a0_d1:
-                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)) < DTYPE_CMP_TOL)
             if self.a0_d0 == C_STAR_CACHE_LEVEL:
                 for k in self.coeffs.a0_d0:
-                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X_star[0, 0]+k*self.n_features_star, k)) < DTYPE_CMP_TOL)
+                    assert(abs(self.f_star[k] - self.get_f_star_c(&self.X[0, 0]+k*self.n_features_total+self.n_features, k)) < DTYPE_CMP_TOL)
             
 
     cdef two_dimensional_step_c(self, Py_ssize_t i, Py_ssize_t j):
-        cdef DTYPE_t* x_i = &self.X[0, 0]+i*self.n_features
-        cdef DTYPE_t* x_j = &self.X[0, 0]+j*self.n_features
+        cdef DTYPE_t* x_i = &self.X[0, 0]+i*self.n_features_total
+        cdef DTYPE_t* x_j = &self.X[0, 0]+j*self.n_features_total
         cdef DTYPE_t Kij = self.kmKij.get_c(x_i, x_j, self.n_features, i, j)
 
-        x_i = &self.X_star[0, 0]+i*self.n_features_star
-        x_j = &self.X_star[0, 0]+j*self.n_features_star
+        x_i = &self.X[0, 0]+i*self.n_features_total+self.n_features
+        x_j = &self.X[0, 0]+j*self.n_features_total+self.n_features
         cdef DTYPE_t Kij_star = self.kmKij_star.get_c(x_i, x_j, self.n_features_star, i, j)
 
         cdef DTYPE_t Kij_sum = Kij + Kij_star
@@ -1275,7 +1275,6 @@ cdef class OCSVM_PLUS_C:
         IF DEBUG:
             self.check_ff_update_c()
 
-
     cdef alpha_2D_step_c(self, Py_ssize_t i, Py_ssize_t j):
         if self.alg == ALG_BEST_STEP_2D and \
            not self.coeffs.dis1[i] and not self.coeffs.dis0[j] and self.f_star[i] - self.f_star[j] > self.tau:
@@ -1284,7 +1283,6 @@ cdef class OCSVM_PLUS_C:
             self.two_dimensional_step_c(i, j)
         else:
             self.alpha_step_c(i, j)
-
 
     cdef delta_2D_step_c(self, Py_ssize_t m, Py_ssize_t n):
         cdef int m_level = self.get_ff_cache_level(m)
@@ -1303,7 +1301,6 @@ cdef class OCSVM_PLUS_C:
         else:
             self.delta_step_c(m, n)
 
-
     cdef level_size_c(self, int ff_cache_level):
         cdef int s = 0
         if self.anot0_dnot01 == ff_cache_level:
@@ -1320,15 +1317,14 @@ cdef class OCSVM_PLUS_C:
             s += self.coeffs.a0_d0.size()            
         return s
 
-
     @cython.boundscheck(False)  # Deactivate bounds checking
     @cython.wraparound(False)   # Deactivate negative indexing.
-    cdef fit_c(self, cnp.ndarray[DTYPE_t, ndim=2] X, cnp.ndarray[DTYPE_t, ndim=2] X_star):
+    cdef fit_c(self, cnp.ndarray[DTYPE_t, ndim=2] X):
         IF DEBUG:
             if self.logging:
                 logging.debug('fit_c')
 
-        self.initialize_c(X, X_star)
+        self.initialize_c(X)
         cdef int C_size, C_star_size, All_elem_size
 
         cdef int i = 0
@@ -1364,7 +1360,6 @@ cdef class OCSVM_PLUS_C:
                 break
         self.calc_b_star_c()
         self.calc_rho_c()
-
 
     def make_best_step(self, 
                        int alpha_pair_level=NONE_ELEM_LEVEL, 
@@ -1504,28 +1499,30 @@ cdef class OCSVM_PLUS_C:
                 logging.debug('std[rho_k]: '+str(np.std(s)))
 
 
-    def correcting_function(self, cnp.ndarray[DTYPE_t, ndim=2] X_star):
+    def correcting_function(self, X_star):
         IF DEBUG:
-            assert(X_star.shape[1] == self.n_features_star)
+            assert(X_star.shape[1] >= self.n_features_star)
         cdef Py_ssize_t i, n_samples = X_star.shape[0]
+        cdef DTYPE_t[::1] x_c
         f_star = np.empty(n_samples, DTYPE)
-        for i in range(n_samples):
-            f_star[i] = self.get_f_star_c(&X_star[0, 0]+i*self.n_features_star) + self.b_star
+        for i, x in enumerate(X_star):
+            x_c = check_array(x[-self.n_features_star:])
+            f_star[i] = self.get_f_star_c(&x_c[0]) + self.b_star
         return f_star
 
-
-    def decision_function(self, cnp.ndarray[DTYPE_t, ndim=2] X):
+    def decision_function(self, X):
         IF DEBUG:
-            assert(X.shape[1] == self.n_features)
+            assert(X.shape[1] >= self.n_features)
         cdef Py_ssize_t i, n_samples = X.shape[0]
+        cdef DTYPE_t[::1] x_c
         f = np.empty(n_samples, DTYPE)
-        for i in range(n_samples):
-            f[i] = self.get_f_c(&X[0, 0]+i*self.n_features) - self.rho
+        for i, x in enumerate(X):
+            x_c = check_array(x[:self.n_features])
+            f[i] = self.get_f_c(&x_c[0]) - self.rho
         return f
 
-
-    def fit(self, X, X_star):
-        return self.fit_c(X, X_star)
+    def fit(self, X, y=None):
+        return self.fit_c(X)
 
     def predict(self, X):
         return np.array([1 if f > 0 else -1 for f in self.decision_function(X)] )
@@ -1534,6 +1531,7 @@ cdef class OCSVM_PLUS_C:
 class OCSVM_PLUS(BaseEstimator):
     def __init__(
             self,
+            n_features,
             kernel='rbf',
             kernel_gamma='scale',
             kernel_star='rbf',
@@ -1548,6 +1546,8 @@ class OCSVM_PLUS(BaseEstimator):
             max_iter=-1,
             random_seed=None,
             logging_file_name=None):
+        self.n_features = n_features
+        self.n_features_star = None
         self.kernel = kernel
         self.kernel_gamma = kernel_gamma
         self.kernel_star = kernel_star
@@ -1565,7 +1565,9 @@ class OCSVM_PLUS(BaseEstimator):
         self.is_fitted_ = False
         self.model_ = None
 
-    def fit(self, X, X_star):
+        if not (self.n_features > 0 and self.n_features == int(self.n_features)):
+            raise ValueError("n_features must be positive integer!")
+
         if not (self.nu > 0 and self.nu < 1):
             raise ValueError("must be 0<\nu <1!")
 
@@ -1581,63 +1583,69 @@ class OCSVM_PLUS(BaseEstimator):
         if not self.max_iter >= -1:
             raise ValueError("bad input for max_iter!")
 
-        X = check_array(X, dtype=DTYPE, order='C')
-        X_star = check_array(X_star, dtype=DTYPE, order='C')
+        if not (self.gamma == 'auto' or self.gamma > 0):
+            raise ValueError("bad input for gamma!")
 
-        n_samples = X.shape[0]
-        n_features = X.shape[1]
-        n_features_star = X_star.shape[1]
+        if not (self.kernel_gamma == 'scale' or self.kernel_gamma == 'auto' or self.kernel_gamma > 0):
+            raise ValueError("bad input for kernel_gamma!")
 
-        if X_star.shape[0] != n_samples:
-            raise ValueError("number of samples in X and X_star must be the same!")
+        if not (self.kernel_star_gamma == 'scale' or self.kernel_star_gamma == 'auto' or self.kernel_star_gamma > 0):
+            raise ValueError("bad input for kernel_star_gamma!")
 
+        if not (self.kernel == 'rbf' or self.kernel == 'linear' or isinstance(self.kernel, kernel)):
+            raise ValueError("bad input for kernel!")
+
+        if not (self.kernel_star == 'rbf' or self.kernel_star == 'linear' or isinstance(self.kernel_star, kernel)):
+            raise ValueError("bad input for kernel_star!")
+
+        if not( (isinstance(self.ff_caches, dict) and 
+                 set(self.ff_caches.keys()) == {'anot0_dnot01', 'anot0_d0', 'anot0_d1', 'a0_dnot01', 'a0_d1', 'a0_d0'} and
+                 set(self.ff_caches.values()).issubsetof({0, 1, 2})) or 
+                self.ff_caches in ['all', 'not_bound', 'not_zero']):
+            raise ValueError("bad input for ff_caches!")
+
+
+    def fit(self, X, y=None):
+        X0 = check_array(X, dtype=DTYPE, order='C')
+        if not self.n_features < X0.shape[1]:
+            raise ValueError("number of features in X must be greater than n_features!")
+        n_samples = X0.shape[0]
+        self.n_features_star = X0.shape[1] - self.n_features
+        X = X0[:, :self.n_features]
+        X_star = X0[:, -self.n_features_star:]
+        
         if self.gamma == 'auto':
             gamma = self.nu * n_samples
         else:
-            if not self.gamma > 0:
-                raise ValueError("bad input for gamma!")
-            else:
-                gamma = self.gamma
+            gamma = self.gamma
 
         if self.kernel_gamma == 'scale':
-            kernel_gamma = 1.0 / (n_features * X.var())
+            kernel_gamma = 1.0 / (self.n_features * X.var())
         elif self.kernel_gamma == 'auto':
-            kernel_gamma = 1.0 / n_features
+            kernel_gamma = 1.0 / self.n_features
         else:
-            if not self.kernel_gamma > 0:
-                raise ValueError("bad input for kernel_gamma!")
-            else:
-                kernel_gamma = self.kernel_gamma
+            kernel_gamma = self.kernel_gamma
 
         if self.kernel_star_gamma == 'scale':
-            kernel_star_gamma = 1.0 / (n_features_star * X_star.var())
+            kernel_star_gamma = 1.0 / (self.n_features_star * X_star.var())
         elif self.kernel_star_gamma == 'auto':
-            kernel_star_gamma = 1.0 / n_features_star
+            kernel_star_gamma = 1.0 / self.n_features_star
         else:
-            if not self.kernel_star_gamma > 0:
-                raise ValueError("bad input for kernel_star_gamma!")
-            else:
-                kernel_star_gamma = self.kernel_star_gamma
+            kernel_star_gamma = self.kernel_star_gamma
 
         if self.kernel == 'rbf':
             K = kernel_rbf(kernel_gamma)
         elif self.kernel == 'linear':
             K = kernel_linear()
         else:
-            if not isinstance(self.kernel, kernel):
-                raise ValueError("bad input for kernel!")
-            else:
-                K = self.kernel
+            K = self.kernel
 
         if self.kernel_star == 'rbf':
             K_star = kernel_rbf(kernel_star_gamma)
         elif self.kernel_star == 'linear':
             K_star = kernel_linear()
         else:
-            if not isinstance(self.kernel_star, kernel):
-                raise ValueError("bad input for kernel_star!")
-            else:
-                K_star = self.kernel_star
+            K_star = self.kernel_star
 
         if self.ff_caches == 'not_bound':
             ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 1, 'a0_d0': 1}
@@ -1646,12 +1654,7 @@ class OCSVM_PLUS(BaseEstimator):
         elif self.ff_caches == 'not_zero':
             ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 2, 'a0_d0': 0}
         else:
-            if not( isinstance(self.ff_caches, dict) and 
-                    set(self.ff_caches.keys()) == {'anot0_dnot01', 'anot0_d0', 'anot0_d1', 'a0_dnot01', 'a0_d1', 'a0_d0'} and
-                    set(self.ff_caches.values()).issubsetof({0, 1, 2})):
-                raise ValueError("bad input for ff_caches!")
-            else:
-                ff_caches = self.ff_caches
+            ff_caches = self.ff_caches
 
         if self.alg == 'best_step_2d':
             alg = ALG_BEST_STEP_2D
@@ -1662,7 +1665,8 @@ class OCSVM_PLUS(BaseEstimator):
         else:
             raise ValueError("bad input for alg!")
 
-        self.model_ = OCSVM_PLUS_C(nu=self.nu,
+        self.model_ = OCSVM_PLUS_C(n_features=self.n_features,
+                                   nu=self.nu,
                                    gamma=gamma,
                                    tau=self.tau,
                                    K=K,
@@ -1675,24 +1679,27 @@ class OCSVM_PLUS(BaseEstimator):
                                    random_seed=self.random_seed,
                                    logging_file_name=self.logging_file_name)
 
-        # sys.stdout.flush()
-        self.model_.fit(X, X_star)
+        self.model_.fit(X0, y)
         self.is_fitted_ = True
         return self
 
     def decision_function(self, X):
-        X = check_array(X)
         check_is_fitted(self, 'is_fitted_')
-        if X.shape[1] != self.model_.n_features:
-            raise ValueError("wrong number of features!")
+        if X.shape[1] < self.n_features:
+            raise ValueError("no enough original features!")
         self.model_.decision_function(X)
 
     def predict(self, X):
-        X = check_array(X)
         check_is_fitted(self, 'is_fitted_')
-        if X.shape[1] != self.model_.n_features:
-            raise ValueError("wrong number of features!")
+        if X.shape[1] < self.n_features:
+            raise ValueError("no enough original features!")
         self.model_.predict(X)
+
+    def correcting_function(self, X_star):
+        check_is_fitted(self, 'is_fitted_')
+        if X_star.shape[1] < self.n_features_star:
+            raise ValueError("not enough privileged features!")
+        self.model_.decision_function(X_star)
 
     @property
     def alphas_(self):

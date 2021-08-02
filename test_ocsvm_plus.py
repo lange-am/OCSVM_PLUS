@@ -319,8 +319,8 @@ class TestOCSVM_PLUS(unittest.TestCase):
         corr_coeff = 0.5
         np.random.seed(0)
         X = generate2Dnormal(n_samples, corr_coeff)
-        X_star = X[:, [1]]
-        X = X[:, [0]]
+        # X_star = X[:, [1]]
+        # X = X[:, [0]]
 
         nu = 0.5012345
         tau = 1e-4
@@ -330,11 +330,11 @@ class TestOCSVM_PLUS(unittest.TestCase):
         else:
             logging_file_name = None
 
-        model = ocsvm_plus.OCSVM_PLUS(nu=nu, tau=tau, 
+        model = ocsvm_plus.OCSVM_PLUS(n_features=1, nu=nu, tau=tau, 
                                       ff_caches='not_bound',
                                       alg='delta_pair',
                                       logging_file_name=logging_file_name)
-        model.fit(X, X_star)
+        model.fit(X)
         self.assertTrue(model.fit_status_)
 
     def test1(self):
@@ -342,8 +342,8 @@ class TestOCSVM_PLUS(unittest.TestCase):
         corr_coeff = 0.5
         np.random.seed(0)
         X = generate2Dnormal(n_samples, corr_coeff)
-        X_star = X[:, [1]]
-        X = X[:, [0]]
+        # X_star = X[:, [1]]
+        # X = X[:, [0]]
 
         nu = 0.5
         tau = 1e-4
@@ -353,11 +353,11 @@ class TestOCSVM_PLUS(unittest.TestCase):
         else:
             logging_file_name = None
 
-        model = ocsvm_plus.OCSVM_PLUS(nu=nu, tau=tau, 
+        model = ocsvm_plus.OCSVM_PLUS(n_features=1, nu=nu, tau=tau, 
                                       ff_caches='not_bound',
                                       alg='best_step',
                                       logging_file_name=logging_file_name)
-        model.fit(X, X_star)
+        model.fit(X)
         self.assertTrue(model.fit_status_)
 
     def test2(self):
@@ -365,8 +365,8 @@ class TestOCSVM_PLUS(unittest.TestCase):
         corr_coeff = 0.5
         np.random.seed(0)
         X = generate2Dnormal(n_samples, corr_coeff)
-        X_star = X[:, [1]]
-        X = X[:, [0]]
+        # X_star = X[:, [1]]
+        # X = X[:, [0]]
 
         nu = 0.5
         tau = 1e-4
@@ -376,11 +376,11 @@ class TestOCSVM_PLUS(unittest.TestCase):
         else:
             logging_file_name = None
 
-        model = ocsvm_plus.OCSVM_PLUS(nu=nu, tau=tau, 
+        model = ocsvm_plus.OCSVM_PLUS(n_features=1, nu=nu, tau=tau, 
                                       ff_caches='not_bound',
                                       alg='best_step_2d',
                                       logging_file_name=logging_file_name)
-        model.fit(X, X_star)
+        model.fit(X)
         self.assertTrue(model.fit_status_)
 
 
