@@ -315,7 +315,7 @@ class TestKernelManager(unittest.TestCase):
 
 class TestOCSVM_PLUS(unittest.TestCase):
     def test0(self):
-        n_samples = 1000
+        n_samples = 100
         corr_coeff = 0.5
         np.random.seed(0)
         X = generate2Dnormal(n_samples, corr_coeff)
@@ -335,10 +335,10 @@ class TestOCSVM_PLUS(unittest.TestCase):
                                       alg='delta_pair',
                                       logging_file_name=logging_file_name)
         model.fit(X, X_star)
-        self.assertTrue(len(model.delta_support_) > 0)
+        self.assertTrue(model.fit_status_)
 
     def test1(self):
-        n_samples = 1000
+        n_samples = 100
         corr_coeff = 0.5
         np.random.seed(0)
         X = generate2Dnormal(n_samples, corr_coeff)
@@ -358,10 +358,10 @@ class TestOCSVM_PLUS(unittest.TestCase):
                                       alg='best_step',
                                       logging_file_name=logging_file_name)
         model.fit(X, X_star)
-        self.assertTrue(len(model.delta_support_) > 0)
+        self.assertTrue(model.fit_status_)
 
     def test2(self):
-        n_samples = 1000
+        n_samples = 100
         corr_coeff = 0.5
         np.random.seed(0)
         X = generate2Dnormal(n_samples, corr_coeff)
@@ -381,7 +381,7 @@ class TestOCSVM_PLUS(unittest.TestCase):
                                       alg='best_step_2d',
                                       logging_file_name=logging_file_name)
         model.fit(X, X_star)
-        self.assertTrue(len(model.delta_support_) > 0)
+        self.assertTrue(model.fit_status_)
 
 
 if __name__ == '__main__':

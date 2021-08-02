@@ -532,9 +532,13 @@ cdef class OCSVM_PLUS_C:
         if logging_file_name is not None:
             self.logging = True
             self.logging_file_name = logging_file_name
-            logging.basicConfig(filename=self.logging_file_name, 
-                                format='%(asctime)s %(message)s',
-                                filemode='w', level=logging.DEBUG)
+            handler = logging.FileHandler(self.logging_file_name, 'w', 'utf-8')
+            handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+            logger=logging.getLogger()
+            for h in logger.handlers:
+                logger.removeHandler(h)
+            logger.setLevel(logging.DEBUG)
+            logger.addHandler(handler)
         else:
             self.logging = False
             self.logging_file_name = self.__class__.__name__
@@ -667,7 +671,7 @@ cdef class OCSVM_PLUS_C:
 
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing. 
     cdef get_f_star_c(self, DTYPE_t* x_star, Py_ssize_t i=-1):
         cdef Py_ssize_t k        
         cdef DTYPE_t s = 0.0
@@ -1518,7 +1522,7 @@ cdef class OCSVM_PLUS_C:
         return self.fit_c(X, X_star)
 
     def predict(self, X):
-        return np.array([1 if f > 0 else -1 for f in self.decision_function(X)])
+        return np.array([1 if f > 0 else -1 for f in self.decision_function(X)] )
 
 
 class OCSVM_PLUS(BaseEstimator):
@@ -1553,9 +1557,8 @@ class OCSVM_PLUS(BaseEstimator):
         self.logging_file_name = logging_file_name
         self.max_iter = max_iter
         self.is_fitted_ = False
-        self.fit_status_ = False
 
-    def fit(self, X, X_star, y=None):
+    def fit(self, X, X_star):
         if not (self.nu > 0 and self.nu < 1):
             raise ValueError("must be 0<\nu <1!")
 
@@ -1667,7 +1670,6 @@ class OCSVM_PLUS(BaseEstimator):
 
         # sys.stdout.flush()
         self.model_.fit(X, X_star)
-        self.fit_status_ = self.alpha_support_.size() > 0 and self.delta_support_.size() > 0
         self.is_fitted_ = True
         return self
 
@@ -1700,6 +1702,10 @@ class OCSVM_PLUS(BaseEstimator):
     @property
     def b_star_(self):
         return self.model_.b_star
+
+    @property
+    def fit_status_(self):
+        return self.alpha_support_.size > 0 and self.delta_support_.size > 0
 
     @property
     def alpha_support_(self):
