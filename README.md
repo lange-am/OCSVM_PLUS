@@ -57,15 +57,15 @@ class ocsvm_plus.OCSVM_PLUS(kernel='rbf', kernel_gamma='scale',
 
 ## Attributes
 
-| **Attributes:**    | **Description**               |
-| :-------           | :-------                      |
-| **alphas_**        | Dual coefficients `alpha_i`     |
-| **deltas_**        | Dual coefficients `delta_i`     |
-| **rho_**           | Decision function intercept   |
-| **b_star_**        | Correcting function intercept |
-| **alpha_support_** | Indices `i` of training examples such that `alpha_i>0`. |
+| **Attributes:**    | **Description**                                           |
+| :-------           | :-------                                                  |
+| **alphas_**        | Dual coefficients `alpha_i`.                              |
+| **deltas_**        | Dual coefficients `delta_i`.                              |
+| **rho_**           | Decision function intercept.                              |
+| **b_star_**        | Correcting function intercept.                            |
+| **alpha_support_** | Indices `i` of training examples such that `alpha_i>0`.   |
 | **delta_support_** | Indices `i` of training examples such that `0<delta_i<1`. |
-| **fit_status_**    | Returns `True` if there were enough support vectors to find intercepts `rho` and `b_star`, `False` otherwise. If `False`, one should make `tau` smaller.| 
+| **fit_status_**    | Returns `True` if there were enough support vectors to find intercepts `rho` and `b_star`, `False` otherwise. If `False`, one should make `tau` smaller.|
 
 ## Methods
 
