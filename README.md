@@ -27,7 +27,7 @@ The debug version performs assertions, obtains intermediate results in different
 # API
 
 ```python
-class ocsvm_plus.OCSVM_PLUS(kernel='rbf', kernel_gamma='scale', 
+class ocsvm_plus.OCSVM_PLUS(n_features, kernel='rbf', kernel_gamma='scale', 
                             kernel_star='rbf', kernel_star_gamma='scale', 
                             nu=0.5, gamma='auto', tau=0.001, 
                             alg='best_step_2d', ff_caches='not_bound', 
