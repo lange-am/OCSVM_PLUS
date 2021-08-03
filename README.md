@@ -1,17 +1,17 @@
 # One-Class SVM+
 
-Unsupervised outlier detection with *privileged information*. Generalizes One-Class *`nu`*-SVM that estimates the support of a high-dimensional distribution by accounting for additional (privileged) set of features available on training stage but unavailable on new data scoring and predicting (for example, future behaviour of a time series). 
+Unsupervised outlier detection with *privileged information*. Generalizes One-Class *`nu`*-SVM that estimates the support of a high-dimensional distribution by accounting for additional (privileged) set of features available in the training phase but not available in evaluating and predicting new data (for example, future time series behavior). 
 
 # Installation
-You can simply download the repository in your folder. Then from its root directory (where `setup.py` is placed) run in the command line
+You can just download the repository to your folder. Then from its root directory (where `setup.py` is located) run on the command line
 
 `python setup.py build_ext --inplace`
 
-After this you can import the library from python:
+After that, you can import the library from python:
 
 `>>> import ocsvm_plus`
 
-Be sure that Python 3 is used, for this you may need print 'python3' instead of 'python'. You also need cython installed (`pip install Cython` or similar). For more confidence, you should run unittests: 
+Make sure you are using Python 3.x, you may need to print "python3" instead of "python" to do this. You will also need Cython installed (`pip install Cython` or similar). To be more confident, you should run unit tests:
 
 `python setup_debug.py build_ext --inplace`<br/>
 `python -m unittest tests`
@@ -20,7 +20,7 @@ Now debug version is also available:
 
 `>>> import ocsvm_plus_debug`
 
-Debug version performs assertions, obtains intermediate results in different ways and checks the equivalence, dumps more detailed info to logged file. It works much slower than basic (release) version.
+The debug version performs assertions, obtains intermediate results in different ways and checks their equivalence, dumps more detailed info to the log file. It works much slower than basic (release) version.
 
 # API
 
