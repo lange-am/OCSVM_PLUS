@@ -1,6 +1,8 @@
 # One-Class SVM+
 
-Unsupervised outlier detection with *privileged information*. Generalizes One-Class *`nu`*-SVM that estimates the support of a high-dimensional distribution by accounting for additional (privileged) set of features available in the training phase but not available in evaluating and predicting new data (for example, future time series behavior). 
+Unsupervised outlier detection with *privileged information*. Generalizes one-class *`nu`*-SVM that estimates the support of a high-dimensional distribution by accounting for additional (privileged) set of features available in the training phase but not available in evaluating and predicting new data (for example, future time series behavior). 
+
+Along with the current SVM models, it solves dual optimization problem with respect to unknown coefficients with *Sequential Minimal Optimization*. SMO finds the two coefficients that violate Karush-Kuhn-Tucker conditions the most, and shifts them in opposite directions keeping their sum constant. The optimization procedure converges to a `tau` -approximate solution, which means that the KKT conditions are satisfied with the tolerance of `tau`.
 
 # Installation
 You can just download the repository to your folder. Then from its root directory (where `setup.py` is located) run on the command line
@@ -50,7 +52,7 @@ class ocsvm_plus.OCSVM_PLUS(kernel='rbf', kernel_gamma='scale',
 | <strong>kernel_cache_size: *int, defailt=0*</strong>                                                         | Size of a cache (number of elements) to store K and K* values according to LRU policy. If 0, then the  kernels K(x_i, x_j) and K*(x*_i, x*_j) are calculated only once and stored as ij-elements of triangular matrices. Limited cache size is memory-efficient, while 0 is the most time-efficient setting. |
 | <strong>distance_cache_size: *int, defailt=0*</strong>                                                       | Size of a cache (number of elements) to store values (K_ii-2K_ij+K_jj)/(nu * n_samples) and (K*_ii-2K*_ij+K*_jj)/gamma, LRU policy is used. If 0, then once a value is calculated, it is stored in triangular matrix. Limited cache size is memory-efficient, while 0 is the most time-efficient setting.|
 | <strong>max_iter: *int, defailt=-1*</strong>                                                               | Hard limit on iterations within solver, or -1 for no limit. |
-| <strong>random_seed: *int or None, defailt=None*</strong>                                                  | Random generator initialization. |
+| <strong>random_seed: *int or None, defailt=None*</strong>                                                  | Random generator initialization for test repeatability.|
 | <strong>logging_file_name: *str or None, defailt=None*</strong>                                            | Text file to dump intermediate results of iterative process of model training. If None, then no logging is performed. |
 
 ## Attributes
