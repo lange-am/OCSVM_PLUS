@@ -15,7 +15,7 @@ After this you can import the library from python:
 Be sure that Python 3 is used, for this you may need print 'python3' instead of 'python'. You also need cython installed (`pip install Cython` or similar). For more confidence, you should run unittests: 
 
 `python setup_debug.py build_ext --inplace`<br/>
-`python -m unittest test_ocsvm_plus`
+`python -m unittest tests`
 
 Now debug version is also available:
 
