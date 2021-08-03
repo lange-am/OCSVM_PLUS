@@ -278,11 +278,11 @@ cdef class AlphasDeltas:
 
     def __init__(self, Py_ssize_t n_samples):
         self.n_samples = n_samples
-        self.a = np.zeros(n_samples, dtype=DTYPE)    #!!!!!!!!!
-        self.d = np.zeros(n_samples, dtype=DTYPE)    #!!!!!!!!!
-        self.ais0 = np.ones(n_samples, dtype=BTYPE)  #!!!!!!!!!
-        self.dis0 = np.ones(n_samples, dtype=BTYPE)  #!!!!!!!!!
-        self.dis1 = np.zeros(n_samples, dtype=BTYPE) #!!!!!!!!!
+        self.a = np.zeros(n_samples, dtype=DTYPE) 
+        self.d = np.zeros(n_samples, dtype=DTYPE) 
+        self.ais0 = np.ones(n_samples, dtype=BTYPE)
+        self.dis0 = np.ones(n_samples, dtype=BTYPE)
+        self.dis1 = np.zeros(n_samples, dtype=BTYPE)
         self.anot0_dnot01 = []
         self.anot0_d0 =[]
         self.anot0_d1 = []

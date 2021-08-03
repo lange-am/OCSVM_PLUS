@@ -1,4 +1,4 @@
-# OCSVM+: unit tests
+# All unit tests
 #
 # Copyright (C) 2021 Andrey M. Lange, 
 # Skoltech, https://crei.skoltech.ru/cdise
