@@ -1,32 +1,33 @@
 # One-Class SVM+
 
-Unsupervised outlier detection with *privileged information*. Generalizes One-Class *`nu`*-SVM that estimates the support of a high-dimensional distribution by accounting for additional (privileged) set of features available on training stage but unavailable on new data scoring and predicting (for example, future behaviour of a time series). 
+Unsupervised outlier detection with *privileged information*. Generalizes one-class *`nu`*-SVM that estimates the support of a high-dimensional distribution by accounting for additional (privileged) set of features available in the training phase but not available in evaluating and predicting new data (for example, future time series behavior). 
+
+Along with the current SVM models, it solves dual optimization problem with respect to unknown coefficients with *Sequential Minimal Optimization*. SMO finds the two coefficients that violate Karush-Kuhn-Tucker conditions the most, and shifts them in opposite directions keeping their sum constant. The optimization procedure converges to a `tau` -approximate solution, which means that the KKT conditions are satisfied with the tolerance of `tau`.
 
 # Installation
-
-You can simply download the repository in your folder. Then from its root directory (where `setup.py` is placed) run in the command line
+You can just download the repository to your folder. Then from its root directory (where `setup.py` is located) run on the command line
 
 `python setup.py build_ext --inplace`
 
-After this you can import the library from python:
+After that, you can import the library from python:
 
 `>>> import ocsvm_plus`
 
-Be sure that Python 3 is used, for this you may need print 'python3' instead of 'python'. You also need cython installed (`pip install Cython` or similar). For more confidence, you should run unittests: 
+Make sure you are using Python 3.x, you may need to print "python3" instead of "python" to do this. You will also need Cython installed (`pip install Cython` or similar). To be more confident, you should run unit tests:
 
 `python setup_debug.py build_ext --inplace`<br/>
-`python -m unittest test_ocsvm_plus`
+`python -m unittest tests`
 
 Now debug version is also available:
 
 `>>> import ocsvm_plus_debug`
 
-Debug version performs assertions, obtains intermediate results in different ways and checks the equivalence, dumps more detailed info to logged file. It works much slower than basic (release) version.
+The debug version performs assertions, obtains intermediate results in different ways and checks their equivalence, dumps more detailed info to the log file. It works much slower than basic (release) version.
 
 # API
 
 ```python
-class ocsvm_plus.OCSVM_PLUS(kernel='rbf', kernel_gamma='scale', 
+class ocsvm_plus.OCSVM_PLUS(n_features, kernel='rbf', kernel_gamma='scale', 
                             kernel_star='rbf', kernel_star_gamma='scale', 
                             nu=0.5, gamma='auto', tau=0.001, 
                             alg='best_step_2d', ff_caches='not_bound', 
@@ -39,6 +40,7 @@ class ocsvm_plus.OCSVM_PLUS(kernel='rbf', kernel_gamma='scale',
 
 | **Parameters:**                                                                                              |  **Description**                                       |
 | :-------                                                                                                     | :-------                                               |
+| <strong>n_features: *int*</strong>                                                                           | Number of original features.                           |
 | <strong>kernel: *{'rbf', 'linear'} or a class derived from ocsvm_plus.kernel, defailt='rbf'*</strong>        | Kernel K for original features `X`.                    |
 | <strong>kernel_gamma: *{'scale', 'auto'} or float, default='scale'*</strong>                                 | Kernel coefficient if K is 'rbf'. For `kernel_gamma='scale'` (default) it uses `kernel_gamma=1/(X.shape[1] * X.var())` as value of `kernel_gamma`. For 'auto' it uses `kernel_gamma=1/X.shape[1]`. |
 | <strong>kernel_star: *{'rbf', 'linear'} or a class derived from ocsvm_plus.kernel, defailt='rbf'*</strong>   | Kernel K* for privileged features `X_star`.            |
@@ -51,29 +53,29 @@ class ocsvm_plus.OCSVM_PLUS(kernel='rbf', kernel_gamma='scale',
 | <strong>kernel_cache_size: *int, defailt=0*</strong>                                                         | Size of a cache (number of elements) to store K and K* values according to LRU policy. If 0, then the  kernels K(x_i, x_j) and K*(x*_i, x*_j) are calculated only once and stored as ij-elements of triangular matrices. Limited cache size is memory-efficient, while 0 is the most time-efficient setting. |
 | <strong>distance_cache_size: *int, defailt=0*</strong>                                                       | Size of a cache (number of elements) to store values (K_ii-2K_ij+K_jj)/(nu * n_samples) and (K*_ii-2K*_ij+K*_jj)/gamma, LRU policy is used. If 0, then once a value is calculated, it is stored in triangular matrix. Limited cache size is memory-efficient, while 0 is the most time-efficient setting.|
 | <strong>max_iter: *int, defailt=-1*</strong>                                                               | Hard limit on iterations within solver, or -1 for no limit. |
-| <strong>random_seed: *int or None, defailt=None*</strong>                                                  | Random generator initialization. |
+| <strong>random_seed: *int or None, defailt=None*</strong>                                                  | Random generator initialization for test repeatability.|
 | <strong>logging_file_name: *str or None, defailt=None*</strong>                                            | Text file to dump intermediate results of iterative process of model training. If None, then no logging is performed. |
 
 ## Attributes
 
-| **Attributes:**    | **Description**               |
-| :-------           | :-------                      |
-| **alphas_**        | Dual coefficients `alpha_i`     |
-| **deltas_**        | Dual coefficients `delta_i`     |
-| **rho_**           | Decision function intercept   |
-| **b_star_**        | Correcting function intercept |
-| **alpha_support_** | Indices `i` of training examples such that `alpha_i>0`. |
+| **Attributes:**    | **Description**                                           |
+| :-------           | :-------                                                  |
+| **alphas_**        | Dual coefficients `alpha_i`.                              |
+| **deltas_**        | Dual coefficients `delta_i`.                              |
+| **rho_**           | Decision function intercept.                              |
+| **b_star_**        | Correcting function intercept.                            |
+| **alpha_support_** | Indices `i` of training examples such that `alpha_i>0`.   |
 | **delta_support_** | Indices `i` of training examples such that `0<delta_i<1`. |
-| **fit_status_**    | Returns `True` if there were enough support vectors to find intercepts `rho` and `b_star`, `False` otherwise. If `False`, one should make `tau` smaller.| 
+| **fit_status_**    | Returns `True` if there were enough support vectors to find intercepts `rho` and `b_star`, `False` otherwise. If `False`, one should make `tau` smaller.|
 
 ## Methods
 
 |**Methods:**                  |**Description**|
 | :-------                     | :-------      |
-|`fit(Xall[, y=None])`         | Detects the soft boundary of the set of original vectors `X[n_samples, n_features]` accounting for privileged vectors `X_star[n_samples, n_features_star]`, where `Xall=[n_samples, n_features + n_features_star]` comprises `X` in the first `n_features` columns and `X_star` in the last `n_features_star` columns. `Xall` is array-like, if not C-ordered contiguous array it is copied. Returns `self`.|
-|`decision_function(X)`        | Signed distance to the separating hyperplane in original feature space, positive for an inlier and negative for an outlier points. `X` is array-like, first `n_features` columns are used, other columns are ignored. Returns `ndarray` of shape `(X.shape[0], )`. |
-|`correcting_function(X_star)` | Slack variables modelled using privileged features. `X_star` is array-like, last `n_features_star` columns are used as privileged vectors, other columns are ignored. Returns `ndarray` of shape `(X_star.shape[0], )`. |
-|`predict(X)`                 | Perform classification on samples in `X`. Similar to `decision_function(X)`, but the output is +1 if the decision function is positive and -1 otherwise.|
+|`fit(Xall[, y=None])`         | Detects the soft boundary of the set of original vectors `X[n_samples, n_features]` accounting for privileged vectors `X_star[n_samples, n_features_star]`, where `Xall=[n_samples, n_features + n_features_star]` comprises `X` in the first `n_features` columns and `X_star` in the last `n_features_star` columns. `Xall` is array-like, if not C-ordered contiguous array it is copied, `y` is ignored. Returns `self`.|
+|`decision_function(X)`        | Signed distance to the separating hyperplane in original feature space, positive for an inlier and negative for an outlier points. `X` is array-like, if not C-ordered contiguous array it is copied. First `n_features` columns are used, other columns are ignored. Returns `ndarray` of shape `(X.shape[0], )`. |
+|`correcting_function(X_star)` | Slack variables modelled using privileged features. `X_star` is array-like, if not C-ordered contiguous array it is copied. Last `n_features_star` columns are used as privileged vectors, other columns are ignored. Returns `ndarray` of shape `(X_star.shape[0], )`. |
+|`predict(X)`                  | Perform classification on samples in `X`. Similar to `decision_function(X)`, but the output is +1 if the decision function is positive and -1 otherwise.|
 
 ## Examples
 
