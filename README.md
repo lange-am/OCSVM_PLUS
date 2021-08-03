@@ -40,6 +40,7 @@ class ocsvm_plus.OCSVM_PLUS(n_features, kernel='rbf', kernel_gamma='scale',
 
 | **Parameters:**                                                                                              |  **Description**                                       |
 | :-------                                                                                                     | :-------                                               |
+| <strong>n_features: *int*</strong>                                                                           | Number of original features.                           |
 | <strong>kernel: *{'rbf', 'linear'} or a class derived from ocsvm_plus.kernel, defailt='rbf'*</strong>        | Kernel K for original features `X`.                    |
 | <strong>kernel_gamma: *{'scale', 'auto'} or float, default='scale'*</strong>                                 | Kernel coefficient if K is 'rbf'. For `kernel_gamma='scale'` (default) it uses `kernel_gamma=1/(X.shape[1] * X.var())` as value of `kernel_gamma`. For 'auto' it uses `kernel_gamma=1/X.shape[1]`. |
 | <strong>kernel_star: *{'rbf', 'linear'} or a class derived from ocsvm_plus.kernel, defailt='rbf'*</strong>   | Kernel K* for privileged features `X_star`.            |
