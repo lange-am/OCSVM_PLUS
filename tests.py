@@ -8,11 +8,16 @@
 
 import unittest
 import numpy as np
+import test_stlcache
 import ocsvm_plus_debug as ocsvm_plus
 
 LOG = True
 DEEP_LOG = False
 DEEP_DEEP_LOG = False
+
+class TestSTLCache(unittest.TestCase):  # test stlcache library, different cache policies
+    def test_lru_lfu(self):
+        self.assertTrue(test_stlcache.TEST_LRU_LFU_RES)
 
 
 def generate2Dnormal(n_samples, corr_coef):

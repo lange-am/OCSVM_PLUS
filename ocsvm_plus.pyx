@@ -1517,7 +1517,7 @@ cdef class OCSVM_PLUS_C:
         cdef DTYPE_t[::1] x_c
         f = np.empty(n_samples, DTYPE)
         for i, x in enumerate(X):
-            x_c = check_array(x[:self.n_features])
+            x_c = check_array(x)
             f[i] = self.get_f_c(&x_c[0]) - self.rho
         return f
 
