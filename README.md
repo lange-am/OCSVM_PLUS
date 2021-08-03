@@ -3,7 +3,6 @@
 Unsupervised outlier detection with *privileged information*. Generalizes One-Class *`nu`*-SVM that estimates the support of a high-dimensional distribution by accounting for additional (privileged) set of features available on training stage but unavailable on new data scoring and predicting (for example, future behaviour of a time series). 
 
 # Installation
-
 You can simply download the repository in your folder. Then from its root directory (where `setup.py` is placed) run in the command line
 
 `python setup.py build_ext --inplace`
