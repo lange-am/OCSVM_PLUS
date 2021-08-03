@@ -1319,7 +1319,7 @@ cdef class OCSVM_PLUS_C:
 
     @cython.boundscheck(False)  # Deactivate bounds checking
     @cython.wraparound(False)   # Deactivate negative indexing.
-    cdef fit_c(self, cnp.ndarray[DTYPE_t, ndim=2] X):
+    def fit(self, cnp.ndarray[DTYPE_t, ndim=2] X):
         IF DEBUG:
             if self.logging:
                 logging.debug('fit_c')
@@ -1498,34 +1498,41 @@ cdef class OCSVM_PLUS_C:
             if self.logging:
                 logging.debug('std[rho_k]: '+str(np.std(s)))
 
-
-    def correcting_function(self, X_star):
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing.
+    def correcting_function(self, cnp.ndarray[DTYPE_t, ndim=2] X_star):
         IF DEBUG:
             assert(X_star.shape[1] >= self.n_features_star)
-        cdef Py_ssize_t i, n_samples = X_star.shape[0]
-        cdef DTYPE_t[::1] x_c
-        f_star = np.empty(n_samples, DTYPE)
-        for i, x in enumerate(X_star):
-            x_c = check_array(x[-self.n_features_star:])
-            f_star[i] = self.get_f_star_c(&x_c[0]) + self.b_star
+        cdef Py_ssize_t n_samples = X_star.shape[0] 
+        cdef Py_ssize_t n_features = X_star.shape[1]
+        cdef DTYPE_t[::1] f_star = np.empty(n_samples, dtype=DTYPE)        
+        cdef DTYPE_t[:, ::1] X_star_ptr = X_star
+        cdef Py_ssize_t i
+        for i in range(n_samples):
+            f_star[i] = self.get_f_star_c(&X_star_ptr[0, 0]+i*n_features+n_features-self.n_features_star) + self.b_star
         return f_star
 
-    def decision_function(self, X):
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing.
+    def decision_function(self, cnp.ndarray[DTYPE_t, ndim=2] X):
         IF DEBUG:
             assert(X.shape[1] >= self.n_features)
-        cdef Py_ssize_t i, n_samples = X.shape[0]
-        cdef DTYPE_t[::1] x_c
-        f = np.empty(n_samples, DTYPE)
-        for i, x in enumerate(X):
-            x_c = check_array(x)
-            f[i] = self.get_f_c(&x_c[0]) - self.rho
+        cdef Py_ssize_t n_samples = X.shape[0] 
+        cdef Py_ssize_t n_features = X.shape[1]
+        cdef DTYPE_t[::1] f = np.empty(n_samples, dtype=DTYPE)        
+        cdef DTYPE_t[:, ::1] Xptr = X
+        cdef Py_ssize_t i
+        for i in range(n_samples):
+            f[i] = self.get_f_c(&Xptr[0, 0] + i*n_features) - self.rho
         return f
 
-    def fit(self, X, y=None):
-        return self.fit_c(X)
-
-    def predict(self, X):
-        return np.array([1 if f > 0 else -1 for f in self.decision_function(X)] )
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing.
+    def predict(self, cnp.ndarray[DTYPE_t, ndim=2] X):
+        cdef DTYPE_t[::1] pred = self.decision_function(X)
+        for i in range(X.shape[0]):
+            pred[i] = 1 if pred[i] > 0 else -1
+        return pred
 
 
 class OCSVM_PLUS(BaseEstimator):
@@ -1565,7 +1572,7 @@ class OCSVM_PLUS(BaseEstimator):
         self.is_fitted_ = False
         self.model_ = None
 
-        if not (self.n_features > 0 and self.n_features == int(self.n_features)):
+        if not (self.n_features > 0 and isinstance(self.n_features, int)):
             raise ValueError("n_features must be positive integer!")
 
         if not (self.nu > 0 and self.nu < 1):
@@ -1574,13 +1581,13 @@ class OCSVM_PLUS(BaseEstimator):
         if not self.tau > 0:
             raise ValueError("bad input for tau!")
 
-        if not self.kernel_cache_size >= 0:
+        if not (self.kernel_cache_size >= 0 and isinstance(self.kernel_cache_size, int)):
             raise ValueError("bad input for kernel_cache_size!")
 
-        if not self.distance_cache_size >= 0:
+        if not (self.distance_cache_size >= 0 and isinstance(self.distance_cache_size, int)):
             raise ValueError("bad input for distance_cache_size!")
 
-        if not self.max_iter >= -1:
+        if not (self.max_iter >= -1 and isinstance(self.max_iter, int)):
             raise ValueError("bad input for max_iter!")
 
         if not (self.gamma == 'auto' or self.gamma > 0):
@@ -1679,27 +1686,30 @@ class OCSVM_PLUS(BaseEstimator):
                                    random_seed=self.random_seed,
                                    logging_file_name=self.logging_file_name)
 
-        self.model_.fit(X0, y)
+        self.model_.fit(X0)
         self.is_fitted_ = True
         return self
 
     def decision_function(self, X):
         check_is_fitted(self, 'is_fitted_')
+        X = check_array(X, dtype=DTYPE, order='C')
         if X.shape[1] < self.n_features:
             raise ValueError("no enough original features!")
-        self.model_.decision_function(X)
+        return np.array(self.model_.decision_function(X))
 
     def predict(self, X):
         check_is_fitted(self, 'is_fitted_')
+        X = check_array(X, dtype=DTYPE, order='C')
         if X.shape[1] < self.n_features:
             raise ValueError("no enough original features!")
-        self.model_.predict(X)
+        return np.array(self.model_.predict(X))
 
     def correcting_function(self, X_star):
         check_is_fitted(self, 'is_fitted_')
+        X_star = check_array(X_star, dtype=DTYPE, order='C')        
         if X_star.shape[1] < self.n_features_star:
             raise ValueError("not enough privileged features!")
-        self.model_.decision_function(X_star)
+        return np.array(self.model_.correcting_function(X_star))
 
     @property
     def alphas_(self):

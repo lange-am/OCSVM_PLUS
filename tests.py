@@ -336,7 +336,6 @@ class TestOCSVM_PLUS(unittest.TestCase):
             logging_file_name = None
 
         model = ocsvm_plus.OCSVM_PLUS(n_features=1, nu=nu, tau=tau, 
-                                      ff_caches='not_bound',
                                       alg='delta_pair',
                                       logging_file_name=logging_file_name)
         model.fit(X)
@@ -359,7 +358,6 @@ class TestOCSVM_PLUS(unittest.TestCase):
             logging_file_name = None
 
         model = ocsvm_plus.OCSVM_PLUS(n_features=1, nu=nu, tau=tau, 
-                                      ff_caches='not_bound',
                                       alg='best_step',
                                       logging_file_name=logging_file_name)
         model.fit(X)
@@ -382,7 +380,6 @@ class TestOCSVM_PLUS(unittest.TestCase):
             logging_file_name = None
 
         model = ocsvm_plus.OCSVM_PLUS(n_features=1, nu=nu, tau=tau, 
-                                      ff_caches='not_bound',
                                       alg='best_step_2d',
                                       logging_file_name=logging_file_name)
         model.fit(X)
