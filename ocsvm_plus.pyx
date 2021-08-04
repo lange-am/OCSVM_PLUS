@@ -1535,7 +1535,7 @@ cdef class OCSVM_PLUS_C:
         return pred
 
 
-class OCSVM_PLUS(BaseEstimator):
+class OneClassSVM_plus(BaseEstimator):
     def __init__(
             self,
             n_features,

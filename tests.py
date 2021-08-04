@@ -319,7 +319,7 @@ class TestKernelManager(unittest.TestCase):
         self.assertTrue(res)
 
 
-class TestOCSVM_PLUS(unittest.TestCase):
+class TestOneClassSVM_plus(unittest.TestCase):
     def test_delta_pair(self):
         n_samples = 100
         corr_coeff = 0.5
@@ -331,9 +331,9 @@ class TestOCSVM_PLUS(unittest.TestCase):
         else:
             logging_file_name = None
 
-        model = ocsvm_plus.OCSVM_PLUS(n_features=1, nu=0.5012345, 
-                                      alg='delta_pair',
-                                      logging_file_name=logging_file_name)
+        model = ocsvm_plus.OneClassSVM_plus(n_features=1, nu=0.5012345, 
+                                            alg='delta_pair',
+                                            logging_file_name=logging_file_name)
         model.fit(X)
 
         check =           np.all(model.decision_function(X)   - model.decision_function(X[:, :1])    < CMP_TOL)
@@ -354,9 +354,9 @@ class TestOCSVM_PLUS(unittest.TestCase):
         else:
             logging_file_name = None
 
-        model = ocsvm_plus.OCSVM_PLUS(n_features=1, 
-                                      alg='best_step',
-                                      logging_file_name=logging_file_name)
+        model = ocsvm_plus.OneClassSVM_plus(n_features=1, 
+                                            alg='best_step',
+                                            logging_file_name=logging_file_name)
         model.fit(X)
 
         check =           np.all(model.decision_function(X)   - model.decision_function(X[:, :1])    < CMP_TOL)
@@ -377,10 +377,10 @@ class TestOCSVM_PLUS(unittest.TestCase):
         else:
             logging_file_name = None
 
-        model = ocsvm_plus.OCSVM_PLUS(n_features=1,
-                                      alg='best_step_2d',
-                                      kernel_cache_size = n_samples,
-                                      logging_file_name=logging_file_name)
+        model = ocsvm_plus.OneClassSVM_plus(n_features=1,
+                                            alg='best_step_2d',
+                                            kernel_cache_size = n_samples,
+                                            logging_file_name=logging_file_name)
         model.fit(X)
         
         check =           np.all(model.decision_function(X)   - model.decision_function(X[:, :1])    < CMP_TOL)
@@ -406,16 +406,16 @@ class TestOCSVM_PLUS(unittest.TestCase):
             log1 = None
             log2 = None
 
-        model0 = ocsvm_plus.OCSVM_PLUS(n_features=1, logging_file_name=log0, random_seed=0).fit(X)
+        model0 = ocsvm_plus.OneClassSVM_plus(n_features=1, logging_file_name=log0, random_seed=0).fit(X)
 
 
-        model1 = ocsvm_plus.OCSVM_PLUS(n_features=1,
-                                       kernel_cache_size = n_samples,
-                                       logging_file_name=log1, random_seed=0).fit(X)
+        model1 = ocsvm_plus.OneClassSVM_plus(n_features=1,
+                                             kernel_cache_size = n_samples,
+                                             logging_file_name=log1, random_seed=0).fit(X)
 
-        model2 = ocsvm_plus.OCSVM_PLUS(n_features=1,
-                                       distance_cache_size = n_samples,
-                                       logging_file_name=log2, random_seed=0).fit(X)
+        model2 = ocsvm_plus.OneClassSVM_plus(n_features=1,
+                                             distance_cache_size = n_samples,
+                                             logging_file_name=log2, random_seed=0).fit(X)
 
         check =           np.all(model0.decision_function(X)   - model1.decision_function(X[:, :1])    < CMP_TOL)
         check = check and np.all(model0.alphas_   - model1.alphas_ < CMP_TOL)
