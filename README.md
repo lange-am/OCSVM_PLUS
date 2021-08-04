@@ -107,7 +107,7 @@ for title, model in [('One-Class nu-SVM', ocsvm), ('One-Class nu-SVM+', ocsvm_pl
 ![alt text](ocsvm.png)
 ![alt text](ocsvm+.png)
 
-OCSVM+ models the signed domain boundary distance (slack  variables `xi` in the original `nu`-SVM), which characterizes the measure of data point anomality through parameterization with privileged features. In this example, the distance to the center of the right-upper bunch was passed as a privileged feature, and the measure of anomality has become associated with this characteric.
+OCSVM+ models the domain boundary distances (slack  variables `xi` in the original `nu`-SVM, which characterize the measure of data point anomality) through parameterization with privileged features. In this example, the distance to the center of the right-upper bunch was passed as a privileged feature, and the measure of anomality has become associated with this characteric.
 
 ## Third party software
 STLCACHE library https://github.com/akashihi/stlcache is used for caching the values of kernel functions, many thanks to the authors.
