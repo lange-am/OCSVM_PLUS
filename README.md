@@ -13,7 +13,7 @@ After that, you can import the library from python:
 
 `>>> import ocsvm_plus`
 
-Make sure you are using Python 3.x, you may need to print "python3" instead of "python" to do this. You will also need Cython installed (`pip install Cython` or similar). To be more confident, you should run unit tests:
+Make sure you are using Python 3.x (you may need to print "python3" instead of "python"). You will also need Cython installed (`pip install Cython` or similar). To be more confident, you should run unit tests:
 
 `python setup_debug.py build_ext --inplace`<br/>
 `python -m unittest tests`
