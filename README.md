@@ -9,7 +9,7 @@ You can just download the repository to your folder. Then from its root director
 
 `python setup.py build_ext --inplace`
 
-After that, you can import the library from python:
+After that, you can import the library from Python:
 
 `>>> import ocsvm_plus`
 
