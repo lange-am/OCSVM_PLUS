@@ -79,5 +79,35 @@ class ocsvm_plus.OCSVM_PLUS(n_features, kernel='rbf', kernel_gamma='scale',
 
 ## Examples
 
+```
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.svm import OneClassSVM
+from ocsvm_plus import OCSVM_PLUS
+
+xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
+x = 0.5*np.random.randn(50, 2)
+X = np.r_[x+2, x-2]
+X_star = ((X[:, 0]-2)**2 + (X[:, 1]-2)**2).reshape(-1, 1) # distance to the right-upper center (2, 2)
+
+ocsvm = OneClassSVM(nu=0.5).fit(X)
+ocsvm_plus = OCSVM_PLUS(n_features=2, nu=0.5, gamma=0.5*X.shape[0]*0.001).fit(np.hstack((X, X_star)))
+
+for title, model in [('One-Class nu-SVM', ocsvm), ('One-Class nu-SVM+', ocsvm_plus)]:
+    plt.figure()
+    plt.gca().set_title(title)
+    
+    Z = model.decision_function(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
+    plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
+    plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
+    plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
+
+    plt.scatter(X[:, 0], X[:, 1], c='white', s=40, edgecolors='k')
+```
+![alt text](ocsvm.png)
+![alt text](ocsvm+.png)
+
+OCSVM+ models the signed domain boundary distance (slack  variables `xi` in the original `nu`-SVM), which characterizes the measure of data point anomality through parameterization with privileged features. In this example, the distance to the center of the right-upper bunch was passed as a privileged feature, and the measure of anomality has become associated with this characteric.
+
 ## Third party software
 STLCACHE library https://github.com/akashihi/stlcache is used for caching the values of kernel functions, many thanks to the authors.
