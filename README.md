@@ -83,15 +83,15 @@ class ocsvm_plus.OCSVM_PLUS(n_features, kernel='rbf', kernel_gamma='scale',
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.svm import OneClassSVM
-from ocsvm_plus import OCSVM_PLUS
+from ocsvm_plus import OneClassSVM_plus
 
 xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
 x = 0.5*np.random.randn(50, 2)
 X = np.r_[x+2, x-2]
-X_star = ((X[:, 0]-2)**2 + (X[:, 1]-2)**2).reshape(-1, 1) # distance to the right-upper center (2, 2)
+X_star = ((X[:, 0]-2)**2 + (X[:, 1]-2)**2).reshape(-1, 1)
 
 ocsvm = OneClassSVM(nu=0.5).fit(X)
-ocsvm_plus = OCSVM_PLUS(n_features=2, nu=0.5, gamma=0.5*X.shape[0]*0.001).fit(np.hstack((X, X_star)))
+ocsvm_plus = OneClassSVM_plus(n_features=2, nu=0.5, gamma=0.5*X.shape[0]*0.0001).fit(np.hstack((X, X_star)))
 
 for title, model in [('One-Class nu-SVM', ocsvm), ('One-Class nu-SVM+', ocsvm_plus)]:
     plt.figure()
@@ -103,7 +103,7 @@ for title, model in [('One-Class nu-SVM', ocsvm), ('One-Class nu-SVM+', ocsvm_pl
     plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
 
     plt.scatter(X[:, 0], X[:, 1], c='white', s=40, edgecolors='k')
-```
+ ```
 ![alt text](ocsvm.png)
 ![alt text](ocsvm+.png)
 
