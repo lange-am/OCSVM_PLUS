@@ -80,30 +80,28 @@ class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale'
 ## Examples
 
 ```
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.svm import OneClassSVM
-from ocsvm_plus import OneClassSVM_plus
+xx, yy = np.meshgrid(np.linspace(-3, 3, 500), np.linspace(-3, 3, 500))
+X = 0.5*np.random.randn(200, 2)
+X[-2:, :] = [[-2.5, 0], [2.5, 0]] # set left and right outliers
+left = X[:, 0] < 0
+X_star = np.empty((X.shape[0], 1))
+X_star[left] = 100*np.random.randn(X[left].shape[0], 1)   # left points spaced chaotically in privileged space
+X_star[~left] = 0.1*np.random.randn(X[~left].shape[0], 1) # right points spaced closely in privileged space
 
-xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
-x = 0.5*np.random.randn(50, 2)
-X = np.r_[x+2, x-2]
-X_star = ((X[:, 0]-2)**2 + (X[:, 1]-2)**2).reshape(-1, 1)
-
-ocsvm = OneClassSVM(nu=0.5).fit(X)
-ocsvm_plus = OneClassSVM_plus(n_features=2, nu=0.5, gamma=0.5*X.shape[0]*0.0001).fit(np.hstack((X, X_star)))
-
+ocsvm = OneClassSVM(nu=0.5, gamma=0.1).fit(X)
+ocsvm_plus = OneClassSVM_plus(n_features=2, nu=0.5, kernel_gamma=0.1, kernel_star_gamma=0.1)
+ocsvm_plus.fit(np.hstack((X, X_star)))
 for title, model in [('One-Class nu-SVM', ocsvm), ('One-Class nu-SVM+', ocsvm_plus)]:
     plt.figure()
     plt.gca().set_title(title)
-    
+
     Z = model.decision_function(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
     plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
     plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
     plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
 
-    plt.scatter(X[:, 0], X[:, 1], c='white', s=40, edgecolors='k')
- ```
+    plt.scatter(X[:, 0], X[:, 1], c='white',  s=40, edgecolors='k')
+```
 ![alt text](ocsvm.png)
 ![alt text](ocsvm+.png)
 
