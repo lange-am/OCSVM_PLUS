@@ -17,6 +17,8 @@ from cython.operator cimport dereference as deref, preincrement as inc
 cimport numpy as cnp
 import numpy as np
 import logging
+import uuid
+import datetime
 
 from libc.math cimport exp as cexp, isnan
 from libcpp.set cimport set as cset
@@ -78,7 +80,7 @@ cdef class kernel:
 
 
 cdef class kernel_rbf(kernel):
-    cdef DTYPE_t kernel_gamma
+    cdef public DTYPE_t kernel_gamma
 
     def __init__(kernel_rbf self, DTYPE_t kernel_gamma):
         super().__init__()
@@ -545,6 +547,14 @@ cdef class OCSVM_PLUS_C:
             self.logging = False
             self.logger = None
             self.logging_file_name = self.__class__.__name__
+
+        if self.logging:
+            logging.info('nu: '+str(nu))
+            logging.info('gamma: '+str(gamma))
+            if isinstance(K, kernel_rbf):
+                logging.info('kernel_gamma: '+str(K.kernel_gamma))
+            if isinstance(K_star, kernel_rbf):
+                logging.info('kernel_star_gamma: '+str(K_star.kernel_gamma))
 
     @cython.boundscheck(False)  # turn off bounds-checking for entire function
     @cython.wraparound(False)   # turn off negative index wrapping for entire function
@@ -1545,10 +1555,10 @@ class OneClassSVM_plus(BaseEstimator):
             kernel_star_gamma='scale',
             nu=0.5,
             gamma='auto',
-            alg='best_step_2d',       # ('best_step', 'delta_pair')
+            alg='best_step_2d',      # ('best_step', 'delta_pair')
             tau=0.001,
-            ff_caches='not_bound',    # ('all', 'not_zero')
-            kernel_cache_size=0, 
+            ff_caches='not_bound',   # ('all', 'not_zero')
+            kernel_cache_size=0,
             distance_cache_size=0,
             max_iter=-1,
             random_seed=None,
@@ -1611,6 +1621,9 @@ class OneClassSVM_plus(BaseEstimator):
                 self.ff_caches in ['all', 'not_bound', 'not_zero']):
             raise ValueError("bad input for ff_caches!")
 
+        if not (self.logging_file_name is None or isinstance(self.logging_file_name, str)):
+            raise ValueError("bad input for logging_file_name!")
+
 
     def fit(self, X, y=None):
         X0 = check_array(X, dtype=DTYPE, order='C')
@@ -1671,6 +1684,12 @@ class OneClassSVM_plus(BaseEstimator):
             alg = ALG_DELTA_STEP_PREF
         else:
             raise ValueError("bad input for alg!")
+
+        if self.logging_file_name == 'uuid':
+            self.logging_file_name = uuid.uuid4().hex+'.log'
+        elif self.logging_file_name == 'time':
+            self.logging_file_name = datetime.datetime.today().strftime("%Y-%m-%d-%H-%M-%S-%f")+'.log'
+
 
         self.model_ = OCSVM_PLUS_C(n_features=self.n_features,
                                    nu=self.nu,
