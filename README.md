@@ -9,7 +9,7 @@ You can just download the repository to your folder. Then from its root director
 
 `python setup.py build_ext --inplace`
 
-After that, you can import the library from python:
+After that, you can import the library from Python:
 
 `>>> import ocsvm_plus`
 
@@ -42,19 +42,19 @@ class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale'
 | :-------                                                                                                     | :-------                                               |
 | <strong>n_features: *int*</strong>                                                                           | Number of original features.                           |
 | <strong>kernel: *{'rbf', 'linear'} or a class derived from ocsvm_plus.kernel, defailt='rbf'*</strong>        | Kernel K for original features `X`.                    |
-| <strong>kernel_gamma: *{'scale', 'auto'} or float, default='scale'*</strong>                                 | Kernel coefficient if K is 'rbf'. For `kernel_gamma='scale'` (default) it uses `kernel_gamma=1/(X.shape[1] * X.var())` as value of `kernel_gamma`. For 'auto' it uses `kernel_gamma=1/X.shape[1]`. |
+| <strong>kernel_gamma: *{'scale', 'auto'} or float, default='scale'*</strong>                                 | Kernel coefficient if K is 'rbf'. For `kernel_gamma='scale'` (default) it uses `kernel_gamma=1/(n_features*X.var())` as value of `kernel_gamma`. For 'auto' it uses `kernel_gamma=1/n_features`. |
 | <strong>kernel_star: *{'rbf', 'linear'} or a class derived from ocsvm_plus.kernel, defailt='rbf'*</strong>   | Kernel K* for privileged features `X_star`.            |
-| <strong>kernel_star_gamma: *{'scale', 'auto'} or float, default='scale'*</strong>                            | Kernel coefficient if K* is 'rbf'. For `kernel_star_gamma='scale'` (default) it uses `kernel_star_gamma=1/(X_star.shape[1] * X_star.var())` as value of kernel_star_gamma. For 'auto' it uses `kernel_star_gamma=1/X_star.shape[1]`.     |
+| <strong>kernel_star_gamma: *{'scale', 'auto'} or float, default='scale'*</strong>                            | Kernel coefficient if K* is 'rbf'. For `kernel_star_gamma='scale'` (default) it uses `kernel_star_gamma=1/(n_features_star*X_star.var())` as value of `kernel_star_gamma`. For 'auto' it uses `kernel_star_gamma=1/n_features_star`.     |
 | <strong>nu: *float, default=0.5*</strong>                                                                    | Parameter of `nu`-SVM, original features regularizer, should be between (0, 1). |
-| <strong>gamma: *'auto' or float, default='auto'*</strong>                                                    | Privileged features regularizer.                 |
+| <strong>gamma: *'auto' or float, default='auto'*</strong>                                                    | Privileged features regularizer. For `gamma='auto'` it uses `gamma=nu*n_samples`. |
 | <strong>tau: *float, default=0.001*</strong>                                                                 | Tolerance for stopping criterion.                |
 | <strong>alg: *{'best_step_2d', 'best_step', 'delta_pair'}, defailt='best_step_2d'*</strong>                  | Mode for optimization procedure, affects processing time. For `'delta_pair'` the algorithm tries to find the most `delta`-violating pair of privileged coefficients and, if no `delta`-pairs remained, then it looks for `alpha`-violating pair of original coefficients. Although `delta`-optimization step for a given `delta`-pair is cheaper in time than `alpha`-step for a pair of `alpha`-coefficients (due to decision and correcting function updates), this option can demonstrate slow convergence. <br/> <br /> `'best_step'` tries to find both the most (worst) `alpha`- and the most `delta`-violating pairs and the most violating one is selected for the optimization step. `'best_step_2d'` is similar to `'best_step'`, but if the selected pair is also a violating pair according to another criterion (not necessarily being the most violating), then the two-dimensional optimization is applied (for example, if the most violating pair is `alpha`-pair of examples `ij` and `delta` KKT condition is also violated, then the shift for two coefficients `alpha_ij` and a shift for two coefficients `delta_ij` are found together). `'best_step_2d'` and `'best_step'` may demonstrate comparable fastness, because the optimization of two pairs of coefficients at once is at the same time more computationally expensive.|
-| <strong>ff_caches: *{'all', 'not_bound', 'not_zero'}, defailt='not_bound'*</strong>                          | Sets ranges for caches of indices of training examples `C` and `C*` for which the values of decision `f(x_i)` and correcting `f*(x*_i)` functions (without their intercepts `–rho` and `b*`) are kept actual on every iteration using simple updates (by subtract old pair of coefficients and add new ones) and without need to full recalculation (summing over all non-zero coefficients). `alpha`-pair is selected over `C`, `delta`-pair is over `C*`. Affects processing time of the optimization procedure. Wide cache provides better choice of violation pairs and less expensive function recalculations, while small cache provides faster violating pair search and smaller number of often `f(x_i)` and `f*(x*_i)` updates. <br /> <br /> `'all'`: both caches include all training examples. `'not_bound'`: `C` includes elements `i` for which `alpha_i>0` or `0<delta_i<1`, `C*` includes all elements. `'not_zero'`: `C` and `C*` covers all elements except those who has both `alpha_i` and `delta_i` zero. Generally, `ff_cache` is a dict with keys `'anot0_dnot01'`, `'anot0_d0'`, `'anot0_d1'`, `'a0_dnot01'`, `'a0_d1'`, `'a0_d0'`, corresponding to six subsets of elements (respectively, `alpha_i>0`, `0<delta_i<1`; `alpha_i>0`, `delta_i=0`; `alpha_i>0`, `delta_i=1`; `alpha_i=0`, `0<delta_i<1`; `alpha_i=0`, `delta_i=1`; `alpha_i=0`, `delta_i=0`) and key values: 2 – subset set belongs to `C` and `C*`, or 1-belongs only to `C*`, or 0-not in caches (`'all'` is equivalent to all key values are 2, `'not_zero'` - all are 2 except `ff_cache ['a0_d0']=0`, `'not_bound'` is equivalent to `ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 1, 'a0_d0': 1}`).|
+| <strong>ff_caches: *{'all', 'not_bound', 'not_zero'}, defailt='not_bound'*</strong>                          | Sets ranges for caches of indices of training examples `C` and `C*` for which the values of decision `f(x_i)` and correcting `f*(x*_i)` functions (without their intercepts `–rho` and `b*`) are kept actual on every iteration using simple updates (by subtract old pair of coefficients and add new ones) and without need to full recalculation (summing over all non-zero coefficients). Affects processing time of the optimization procedure. `alpha`-pair is selected over `C`, `delta`-pair is over `C*`. A wider cache provides a better selection of violation pairs and less costly function recalculations, while a smaller cache results in faster search for violation pairs and fewer updated f (x_i) and f * (x *_i). <br /> <br /> `'all'`: both caches include all training examples. `'not_bound'`: `C` includes elements `i` for which `alpha_i>0` or `0<delta_i<1`, `C*` includes all elements. `'not_zero'`: `C` and `C*` covers all elements except those who has both `alpha_i` and `delta_i` zero. Generally, `ff_cache` is a dict with keys `'anot0_dnot01'`, `'anot0_d0'`, `'anot0_d1'`, `'a0_dnot01'`, `'a0_d1'`, `'a0_d0'`, corresponding to six subsets of elements (respectively, `alpha_i>0`, `0<delta_i<1`; `alpha_i>0`, `delta_i=0`; `alpha_i>0`, `delta_i=1`; `alpha_i=0`, `0<delta_i<1`; `alpha_i=0`, `delta_i=1` and `alpha_i=0`, `delta_i=0`) and key values: 2 – a subset belongs to both `C` and `C*`, or 1 - belongs only to `C*`, or 0 - not in caches (`'all'` is equivalent to all key values are 2, `'not_zero'` - all key values are 2 except `ff_cache['a0_d0']=0`, `'not_bound'` is equivalent to `ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 1, 'a0_d0': 1}`).|
 | <strong>kernel_cache_size: *int, defailt=0*</strong>                                                         | Size of a cache (number of elements) to store K and K* values according to LRU policy. If 0, then the  kernels K(x_i, x_j) and K*(x*_i, x*_j) are calculated only once and stored as ij-elements of triangular matrices. Limited cache size is memory-efficient, while 0 is the most time-efficient setting. |
 | <strong>distance_cache_size: *int, defailt=0*</strong>                                                       | Size of a cache (number of elements) to store values (K_ii-2K_ij+K_jj)/(nu * n_samples) and (K*_ii-2K*_ij+K*_jj)/gamma, LRU policy is used. If 0, then once a value is calculated, it is stored in triangular matrix. Limited cache size is memory-efficient, while 0 is the most time-efficient setting.|
 | <strong>max_iter: *int, defailt=-1*</strong>                                                               | Hard limit on iterations within solver, or -1 for no limit. |
 | <strong>random_seed: *int or None, defailt=None*</strong>                                                  | Random generator initialization for test repeatability.|
-| <strong>logging_file_name: *str or None, defailt=None*</strong>                                            | Text file to dump intermediate results of iterative process of model training. If None, then no logging is performed. |
+| <strong>logging_file_name: *str, 'uuid', 'time' or None, defailt=None*</strong>                            | Text file name to dump intermediate results of iterative process of model training. If None, then no logging is performed. For `'uuid'` the filename is set to an universally unique identifier, for example, `592541c44ae044b3a3f24119b1951e63.log`. For `'time'` it is set to current time, i.e. `YYYY-mm-dd-HH-MM-SS-ffffff.log`|
 
 ## Attributes
 
@@ -66,7 +66,7 @@ class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale'
 | **b_star_**        | Correcting function intercept.                            |
 | **alpha_support_** | Indices `i` of training examples such that `alpha_i>0`.   |
 | **delta_support_** | Indices `i` of training examples such that `0<delta_i<1`. |
-| **fit_status_**    | Returns `True` if there were enough support vectors to find intercepts `rho` and `b_star`, `False` otherwise. If `False`, one should make `tau` smaller.|
+| **fit_status_**    | Returns `True` if there were enough support vectors to find intercepts `rho` and `b_star`, `False` otherwise. If `False`, one should make `tau` smaller and/or increase `max_iter`.|
 
 ## Methods
 
@@ -80,34 +80,32 @@ class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale'
 ## Examples
 
 ```
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.svm import OneClassSVM
-from ocsvm_plus import OneClassSVM_plus
+xx, yy = np.meshgrid(np.linspace(-3, 3, 500), np.linspace(-3, 3, 500))
+X = 0.5*np.random.randn(200, 2)
+X[-2:, :] = [[-2.5, 0], [2.5, 0]] # set left and right outliers
+left = X[:, 0] < 0
+X_star = np.empty((X.shape[0], 1))
+X_star[left] = 100*np.random.randn(X[left].shape[0], 1)   # left points spaced chaotically in privileged space
+X_star[~left] = 0.1*np.random.randn(X[~left].shape[0], 1) # right points spaced closely in privileged space
 
-xx, yy = np.meshgrid(np.linspace(-5, 5, 500), np.linspace(-5, 5, 500))
-x = 0.5*np.random.randn(50, 2)
-X = np.r_[x+2, x-2]
-X_star = ((X[:, 0]-2)**2 + (X[:, 1]-2)**2).reshape(-1, 1)
-
-ocsvm = OneClassSVM(nu=0.5).fit(X)
-ocsvm_plus = OneClassSVM_plus(n_features=2, nu=0.5, gamma=0.5*X.shape[0]*0.0001).fit(np.hstack((X, X_star)))
-
+ocsvm = OneClassSVM(nu=0.5, gamma=0.1).fit(X)
+ocsvm_plus = OneClassSVM_plus(n_features=2, nu=0.5, kernel_gamma=0.1, kernel_star_gamma=0.1)
+ocsvm_plus.fit(np.hstack((X, X_star)))
 for title, model in [('One-Class nu-SVM', ocsvm), ('One-Class nu-SVM+', ocsvm_plus)]:
     plt.figure()
     plt.gca().set_title(title)
-    
+
     Z = model.decision_function(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
     plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
     plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
     plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
 
-    plt.scatter(X[:, 0], X[:, 1], c='white', s=40, edgecolors='k')
- ```
+    plt.scatter(X[:, 0], X[:, 1], c='white',  s=40, edgecolors='k')
+```
 ![alt text](ocsvm.png)
 ![alt text](ocsvm+.png)
 
-OCSVM+ models the domain boundary distances (slack  variables `xi` in the original `nu`-SVM, which characterize the measure of data point anomality) through parameterization with privileged features. In this example, the distance to the center of the right-upper bunch was passed as a privileged feature, and the measure of anomality has become associated with this characteric.
+OCSVM+ models the domain boundary distances (slack  variables `xi` in the original `nu`-SVM, which characterize the measure of data point anomality) through parameterization with privileged features. In this example, the distance to the center of the right-upper bunch was passed as a privileged feature, and therefore, the measure of anomality has become associated with this characteric.
 
 ## Third party software
 STLCACHE library https://github.com/akashihi/stlcache is used for caching the values of kernel functions, many thanks to the authors.
