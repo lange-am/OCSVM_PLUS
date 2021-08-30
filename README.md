@@ -66,7 +66,7 @@ class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale'
 | **b_star_**        | Correcting function intercept.                            |
 | **alpha_support_** | Indices `i` of training examples such that `alpha_i>0`.   |
 | **delta_support_** | Indices `i` of training examples such that `0<delta_i<1`. |
-| **fit_status_**    | Returns `True` if there were enough support vectors to find intercepts `rho` and `b_star`, `False` otherwise. If `False`, one should make `tau` smaller.|
+| **fit_status_**    | Returns `True` if there were enough support vectors to find intercepts `rho` and `b_star`, `False` otherwise. If `False`, one should make `tau` smaller and/or increase `max_iter`.|
 
 ## Methods
 
