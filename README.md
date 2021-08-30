@@ -54,7 +54,7 @@ class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale'
 | <strong>distance_cache_size: *int, defailt=0*</strong>                                                       | Size of a cache (number of elements) to store values (K_ii-2K_ij+K_jj)/(nu * n_samples) and (K*_ii-2K*_ij+K*_jj)/gamma, LRU policy is used. If 0, then once a value is calculated, it is stored in triangular matrix. Limited cache size is memory-efficient, while 0 is the most time-efficient setting.|
 | <strong>max_iter: *int, defailt=-1*</strong>                                                               | Hard limit on iterations within solver, or -1 for no limit. |
 | <strong>random_seed: *int or None, defailt=None*</strong>                                                  | Random generator initialization for test repeatability.|
-| <strong>logging_file_name: *str, 'uuid', 'time' or None, defailt=None*</strong>                            | Text file name to dump intermediate results of iterative process of model training. If None, then no logging is performed. For `'uuid'` the filename is set to an universally unique identifier, for example, `592541c44ae044b3a3f24119b1951e63.log`. For `'time'` it is set to current time, i.e. `YYYY-mm-dd-HH-MM-SS-MICROS.log`|
+| <strong>logging_file_name: *str, 'uuid', 'time' or None, defailt=None*</strong>                            | Text file name to dump intermediate results of iterative process of model training. If None, then no logging is performed. For `'uuid'` the filename is set to an universally unique identifier, for example, `592541c44ae044b3a3f24119b1951e63.log`. For `'time'` it is set to current time, i.e. `YYYY-mm-dd-HH-MM-SS-ffffff.log`|
 
 ## Attributes
 
