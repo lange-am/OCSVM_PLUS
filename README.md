@@ -81,17 +81,23 @@ class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale'
 
 ```
 xx, yy = np.meshgrid(np.linspace(-3, 3, 500), np.linspace(-3, 3, 500))
+np.random.seed(0)
 X = 0.5*np.random.randn(200, 2)
 X[-2:, :] = [[-2.5, 0], [2.5, 0]] # set left and right outliers
+
+# OCSVM
+ocsvm = OneClassSVM(nu=0.5, gamma=0.1).fit(X)
+
+# OCSVM+
 left = X[:, 0] < 0
 X_star = np.empty((X.shape[0], 1))
-X_star[left] = 100*np.random.randn(X[left].shape[0], 1)   # left points spaced chaotically in privileged space
 X_star[~left] = 0.1*np.random.randn(X[~left].shape[0], 1) # right points spaced closely in privileged space
+X_star[left] = (2*np.random.rand(X[left].shape[0], 1)-1) * 100
+X_star[left] = X_star[left] + 10*np.sign(X_star[left])    # left points spaced chaotically in privileged space, (-110, -10) or (10, 110)
+ocsvm_plus = OneClassSVM_plus(n_features=2, nu=0.5, gamma=0.1, kernel_gamma=0.1, kernel_star_gamma=0.1, tau=1e-3).fit(np.hstack((X, X_star)))
 
-ocsvm = OneClassSVM(nu=0.5, gamma=0.1).fit(X)
-ocsvm_plus = OneClassSVM_plus(n_features=2, nu=0.5, kernel_gamma=0.1, kernel_star_gamma=0.1)
-ocsvm_plus.fit(np.hstack((X, X_star)))
-for title, model in [('One-Class nu-SVM', ocsvm), ('One-Class nu-SVM+', ocsvm_plus)]:
+for title, model in [('One-Class nu-SVM', ocsvm),
+                     ('One-Class nu-SVM+ \n when left points are anomalies in privileged space', ocsvm_plus)]:
     plt.figure()
     plt.gca().set_title(title)
 
@@ -100,7 +106,24 @@ for title, model in [('One-Class nu-SVM', ocsvm), ('One-Class nu-SVM+', ocsvm_pl
     plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
     plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
 
-    plt.scatter(X[:, 0], X[:, 1], c='white',  s=40, edgecolors='k')
+    if 'One-Class nu-SVM+' in title:
+        if model.fit_status_:
+            plt.scatter(X[model.alpha_support_, 0], X[model.alpha_support_, 1], c='r',  s=100, edgecolors='r', label='alpha_i>0', marker='s')
+            
+            delta0 = [i for i in range(X.shape[0]) if model.deltas_[i] < 1e-05 and i not in model.delta_support_]
+            plt.scatter(X[delta0, 0], X[delta0, 1], c='w', s=60, edgecolors='k', label='delta_i=0')
+                        
+            plt.scatter(X[model.delta_support_, 0], X[model.delta_support_, 1], c='g', s=70, edgecolors='k', label='0<delta_i<1')
+            
+            delta1 = [i for i in range(X.shape[0]) if model.deltas_[i] > 1-1e-05 and i not in model.delta_support_]
+            plt.scatter(X[delta1, 0], X[delta1, 1], c='orange', s=70, edgecolors='k', label='delta_i=1')
+    else: # OCSVM
+        plt.scatter(X[model.support_, 0], X[model.support_, 1], c='r',  s=80, edgecolors='k', label='alpha_i>0', marker='s')
+        
+        alpha0 = [i for i in range(X.shape[0]) if i not in model.support_]
+        plt.scatter(X[alpha0, 0], X[alpha0, 1], c='lightgrey',  s=70, edgecolors='k', label='alpha_i=0')
+        
+    plt.gca().legend()
 ```
 ![alt text](ocsvm.png)
 ![alt text](ocsvm+.png)
