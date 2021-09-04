@@ -1332,7 +1332,7 @@ cdef class OCSVM_PLUS_C:
     def fit(self, cnp.ndarray[DTYPE_t, ndim=2] X):
         IF DEBUG:
             if self.logging:
-                logging.debug('fit_c')
+                logging.debug('fit')
 
         self.initialize_c(X)
         cdef int C_size, C_star_size, All_elem_size
