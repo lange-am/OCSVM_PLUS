@@ -66,8 +66,7 @@ class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale'
 | **b_star_**        | Correcting function intercept.                            |
 | **alpha_support_** | Indices `i` of training examples such that `alpha_i>0`.   |
 | **delta_support_** | Indices `i` of training examples such that `0<delta_i<1`. |
-| **fit_status_**    | Returns `True` if there were enough support coefficients to correctly find intercepts `rho` and `b_star`: non-zero number of non-bound coefficients `0<delta_k<1`. If there are no such coefficients, then `b_star` is found as `-(f^*(x_m^*)+f^*(x_n^*))/2`, where `mn` is `delta`-pair, and but `fit_status_` is set to `False`.
-If this case one should make `tau` smaller and/or increase `max_iter`.|
+| **fit_status_**    | Returns `True` if there were at least one non-bound coefficient `0<delta_k<1` to correctly find intercepts `rho` and `b_star`. Otherwise, `b_star=-(f^*(x_m^*)+f^*(x_n^*))/2`, where `mn` is `delta`-pair. In this case `fit_status_` is set to `False`, and one should make `tau` smaller and/or increase `max_iter`.|
 
 ## Methods
 
