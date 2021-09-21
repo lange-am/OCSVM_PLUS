@@ -24,6 +24,7 @@ from libc.math cimport exp as cexp, isnan
 from libcpp.set cimport set as cset
 from libcpp.pair cimport pair as cpair
 from libcpp.vector cimport vector as cvector
+from cvxopt import matrix, solvers                 # Temporary, for comparison
 
 cimport stlcache
 
@@ -38,6 +39,7 @@ ITYPE = np.intc
 BTYPE = np.uint8
 cdef DTYPE_t NP_NAN = np.nan
 cdef DTYPE_t DTYPE_CMP_TOL = 1e-10
+cdef DTYPE_t CVXOPT_CMP_TOL = 1e-5 # to decide what delta_i == 0 and delta_i == 1 after applying offline interior point method
 
 ctypedef cpair[Py_ssize_t, Py_ssize_t] PAIR_IJ
 ctypedef cpair[Py_ssize_t, DTYPE_t] PAIR_IF
@@ -67,7 +69,7 @@ cdef class kernel:
         self.ncalls = 0
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef DTYPE_t get_c(self, DTYPE_t* x, DTYPE_t* y,  Py_ssize_t n_features,
                        Py_ssize_t ix=-1, Py_ssize_t iy=-1): # ix, iy are used in derived classes
         self.ncalls +=1
@@ -87,21 +89,24 @@ cdef class kernel_rbf(kernel):
         self.kernel_gamma = kernel_gamma
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef DTYPE_t get_c(self, DTYPE_t* x, DTYPE_t* y, Py_ssize_t n_features,
                        Py_ssize_t ix=-1, Py_ssize_t iy=-1): # ix, iy are used in derived classes:
         kernel.get_c(self, x, y, ix, iy)
         cdef Py_ssize_t i
         cdef DTYPE_t d, s = 0.0
-        for i in range(n_features):
-            d = x[i] - y[i]
-            s += d*d
-        return cexp(- self.kernel_gamma * s)
+        if ix > -1 and iy > -1 and ix == iy:
+            return 1.0
+        else:
+            for i in range(n_features):
+                d = x[i] - y[i]
+                s += d*d
+            return cexp(- self.kernel_gamma * s)
 
 
 cdef class kernel_linear(kernel):
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef DTYPE_t get_c(self, DTYPE_t* x, DTYPE_t* y, Py_ssize_t n_features,
                        Py_ssize_t ix=-1, Py_ssize_t iy=-1): # ix, iy are used in derived classes:
         kernel.get_c(self, x, y, ix, iy) # ix, iy are used in derived classes
@@ -123,7 +128,7 @@ cdef class kernel_ii_ij_jj(kernel):
         self.norm_const = norm_const
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef DTYPE_t get_c(self, DTYPE_t* x, DTYPE_t* y, Py_ssize_t n_features,
                        Py_ssize_t ix=-1, Py_ssize_t iy=-1):
         return (self.K.get_c(x, x, n_features, ix, ix) - 2*self.K.get_c(x, y, n_features, ix, iy) + self.K.get_c(y, y, n_features, iy, iy)) / self.norm_const
@@ -135,15 +140,21 @@ cdef class KernelManager(kernel):
     cdef readonly int was_not_in_cache
     cdef readonly int xy_calculated # number of direct calls by vectors x, y without check in cache, i.e. ix < 0 or iy < 0 passed to .get()
 
-    def __init__(self, kernel K, Py_ssize_t cache_size):
+    def __init__(self, kernel K, Py_ssize_t cache_size=0):
         super().__init__()
         self.K = K
         self.cache_size = cache_size
+        self.was_in_cache = 0
+        self.was_not_in_cache = 0
+        self.xy_calculated = 0
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef DTYPE_t get_c(self, DTYPE_t* x, DTYPE_t* y, Py_ssize_t n_features, Py_ssize_t ix=-1, Py_ssize_t iy=-1):
-        pass
+        self.ncalls += 1
+        if ix < 0 or iy < 0:
+            self.xy_calculated += 1
+        return self.K.get_c(x, y, n_features, ix, iy)
 
     IF DEBUG:
         def get(self, DTYPE_t[::1] x, DTYPE_t[::1] y, ix=-1, iy=-1):
@@ -152,9 +163,7 @@ cdef class KernelManager(kernel):
             return self.get_c(x0, y0, x.shape[0], ix, iy)
 
     cdef reset_c(self):
-        self.was_in_cache = 0
-        self.was_not_in_cache = 0
-        self.xy_calculated = 0
+        self.__init__(self.K, self.cache_size)
 
     IF DEBUG:
         def reset(self):
@@ -164,12 +173,13 @@ cdef class KernelSetManager(KernelManager):
     cdef stlcache.cache[PAIR_IJ, DTYPE_t, KERNEL_CACHE_POLICY_TYPE] *C
 
     def __cinit__(self, kernel K, Py_ssize_t cache_size):
+        self.C = new stlcache.cache[PAIR_IJ, DTYPE_t, KERNEL_CACHE_POLICY_TYPE](cache_size)
+
+    def __init__(self, kernel K, Py_ssize_t cache_size):
         super().__init__(K, cache_size)
-        self.C = NULL
-        self.reset_c()
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef DTYPE_t get_c(self, DTYPE_t* x, DTYPE_t* y, Py_ssize_t n_features, Py_ssize_t ix=-1, Py_ssize_t iy=-1):
         cdef DTYPE_t* x0
         cdef DTYPE_t* y0
@@ -177,6 +187,7 @@ cdef class KernelSetManager(KernelManager):
         cdef cpair[bint, DTYPE_t] cache_response
         cdef DTYPE_t ker
 
+        self.ncalls += 1
         if ix < 0 or iy < 0:
             self.xy_calculated += 1
             return self.K.get_c(x, y, n_features, ix, iy)
@@ -201,9 +212,9 @@ cdef class KernelSetManager(KernelManager):
                 return ker
 
     cdef reset_c(self):
-        KernelManager.reset_c(self)
         if self.C != NULL:
             del self.C
+        self.__init__(self.K, self.cache_size)
         self.C = new stlcache.cache[PAIR_IJ, DTYPE_t, KERNEL_CACHE_POLICY_TYPE](self.cache_size)
 
     @property
@@ -211,7 +222,8 @@ cdef class KernelSetManager(KernelManager):
         return self.C.size()
 
     def __dealloc__(self):
-        del self.C
+        if self.C != NULL:
+            del self.C
 
 cdef class KernelMatrixManager(KernelManager):
     cdef cvector[cvector[DTYPE_t]] C
@@ -224,16 +236,16 @@ cdef class KernelMatrixManager(KernelManager):
         for i in range(cache_size):
             tmp_vec.push_back(NP_NAN)
             self.C.push_back(tmp_vec)
-        self.reset_c()
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef DTYPE_t get_c(self, DTYPE_t* x, DTYPE_t* y, Py_ssize_t n_features, Py_ssize_t ix=-1, Py_ssize_t iy=-1):
         cdef DTYPE_t* x0
         cdef DTYPE_t* y0
         cdef Py_ssize_t ix0, iy0
         cdef DTYPE_t ker
 
+        self.ncalls += 1
         if ix < 0 or iy < 0:
             self.xy_calculated += 1
             return self.K.get_c(x, y, n_features, ix, iy)
@@ -260,12 +272,11 @@ cdef class KernelMatrixManager(KernelManager):
                 return ker
 
     cdef reset_c(self):
-        cdef Py_ssize_t i, j
-
-        KernelManager.reset_c(self)
+        cdef Py_ssize_t i
         for i in range(self.cache_size):
-            for j in range(i+1):
-                self.C[i][j] = NP_NAN
+            self.C[i].clear()
+        self.C.clear()
+        self.__init__(self.K, self.cache_size)
 
     @property
     def cache_actual_size(self):
@@ -488,7 +499,8 @@ cdef class OCSVM_PLUS_C:
                  kernel K = kernel_linear(),
                  kernel K_star = kernel_linear(),
                  object random_seed = None,
-                 dict ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 1, 'a0_d0': 1},
+                 dict ff_caches = {'anot0_dnot01': C_CACHE_LEVEL, 'anot0_d0': C_CACHE_LEVEL, 'anot0_d1': C_CACHE_LEVEL, 'a0_dnot01': C_CACHE_LEVEL, 
+                                   'a0_d1': C_STAR_CACHE_LEVEL, 'a0_d0': C_STAR_CACHE_LEVEL},
                  Py_ssize_t k_cache_size=0,            # 0: the whole matrix is cached, >0 - set cache is used
                  Py_ssize_t kii_ij_jj_cache_size=0,    # 0: the whole matrix is cached, >0 - set cache is used
                  int alg = ALG_BEST_STEP,
@@ -666,7 +678,7 @@ cdef class OCSVM_PLUS_C:
         self.f = np.empty(self.n_samples, dtype=DTYPE)
         self.f_star = np.empty(self.n_samples, dtype=DTYPE)
         for i in range(self.n_samples):
-            self.f[i] = NP_NAN            
+            self.f[i] = NP_NAN
             self.f_star[i] = NP_NAN
 
         self.recalculate_f(C_CACHE_LEVEL)
@@ -675,7 +687,7 @@ cdef class OCSVM_PLUS_C:
 
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef get_f_c(self, DTYPE_t* x, Py_ssize_t i=-1):
         cdef Py_ssize_t k
         cdef DTYPE_t s = 0.0
@@ -689,7 +701,7 @@ cdef class OCSVM_PLUS_C:
 
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing. 
+    @cython.wraparound(False)   # Deactivate negative indexing
     cdef get_f_star_c(self, DTYPE_t* x_star, Py_ssize_t i=-1):
         cdef Py_ssize_t k        
         cdef DTYPE_t s = 0.0
@@ -1327,8 +1339,131 @@ cdef class OCSVM_PLUS_C:
             s += self.coeffs.a0_d0.size()            
         return s
 
+    # Temporary, for comparison
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
+    def fit_interior_point(self, cnp.ndarray[DTYPE_t, ndim=2] X):
+        IF DEBUG:
+            if self.logging:
+                logging.debug('fit_interior_point')
+
+        cdef int anot0_dnot01_ = self.anot0_dnot01
+        cdef int anot0_d0_ = self.anot0_d0
+        cdef int anot0_d1_ = self.anot0_d1
+        cdef int a0_dnot01_ = self.a0_dnot01
+        cdef int a0_d1_ = self.a0_d1
+        cdef int a0_d0_ = self.a0_d0
+        cdef DTYPE_t* x
+        cdef DTYPE_t* y
+        cdef DTYPE_t* x_star
+        cdef DTYPE_t* y_star
+        cdef Py_ssize_t i, j
+
+        self.X = X
+        self.n_samples = X.shape[0]
+        self.nu_nsamples = self.nu * self.n_samples
+
+        if self.k_cache_size > 0:
+            self.kmK = KernelMatrixManager(self.kerK, self.k_cache_size)
+            self.kmK_star = KernelMatrixManager(self.kerK_star, self.k_cache_size)
+        else:
+            self.kmK = KernelMatrixManager(self.kerK, self.n_samples)
+            self.kmK_star = KernelMatrixManager(self.kerK_star, self.n_samples)
+
+        self.n_features_total = X.shape[1]
+        self.n_features_star = self.n_features_total - self.n_features
+        if self.n_features_star < 1:
+            raise ValueError("not enough features in X!")
+
+        if self.logging:
+            logging.info('kernels calculation')
+
+        cdef int n = self.n_samples
+        Alpha = matrix(0.0, (n, n))
+        Delta = matrix(0.0, (n, n))
+
+        for i in range(n):
+            x = &self.X[0, 0] + i*self.n_features_total
+            Alpha[i, i] = self.kmK.get_c(x, x, self.n_features, i, i)
+
+            x_star = &self.X[0, 0] + i*self.n_features_total + self.n_features
+            Delta[i, i] = self.kmK_star.get_c(x_star, x_star, self.n_features_star, i, i) * (self.nu_nsamples / self.gamma)
+
+            for j in range(i):
+                y = &self.X[0, 0] + j*self.n_features_total
+                v = self.kmK.get_c(x, y, self.n_features, i, j)
+                Alpha[i, j] = v
+                Alpha[j, i] = v
+
+                y_star = &self.X[0, 0] + j*self.n_features_total + self.n_features
+                v = self.kmK_star.get_c(x_star, y_star, self.n_features_star, i, j) * (self.nu_nsamples / self.gamma)
+                Delta[i, j] = v
+                Delta[j, i] = v
+
+        P = matrix([[matrix([[Alpha + Delta], [-1.0*Delta]]).T], [matrix([[-1.0*Delta], [Delta]]).T]])
+        q = matrix([0.0]*(2*n))
+
+        A = matrix([[1.0, 0.0]]*n+[[0.0, 1.0]]*n)
+        b = matrix([self.nu_nsamples, self.nu_nsamples])
+
+        G = matrix(0.0, (3*n, 2*n))
+        G[::3*n+1] = -1.0
+        G[3*n*n+2*n::3*n+1] = 1.0
+        h = matrix([0.0]*(2*n)+[1.0]*n)
+
+        if self.logging:
+            logging.info('cone QP')
+
+        solvers.options['show_progress'] = False
+        c = np.array(solvers.coneqp(P, q, G, h, {'l': G.size[0], 'q': [], 's': []}, A, b, show_progress=False)['x'])
+
+        if self.logging:
+            logging.info('stop')
+
+        self.coeffs = AlphasDeltas(n)
+        for i in range(n):
+            alpha = c[i]
+            delta = c[n+i]
+            if alpha < CVXOPT_CMP_TOL:
+                self.coeffs.set_a0_c(i)
+            else:
+                self.coeffs.set_anot0_c(i, alpha)
+
+            if delta < CVXOPT_CMP_TOL:
+                self.coeffs.set_d0_c(i)
+            elif delta > 1.0-CVXOPT_CMP_TOL:
+                self.coeffs.set_d1_c(i)
+            else:
+                self.coeffs.set_dnot01_c(i, delta)
+
+        if self.logging:
+            logging.info('alpha > 0: '+str(self.coeffs.a_not0_size())+', 0 < delta < 1: '+str(self.coeffs.d_not01_size())+', delta > 0: '+str(self.coeffs.d_not0_size())+', alpha=0, delta=0: '+str(self.coeffs.a0_d0.size())+', alpha > 0 and 0 < delta < 1: '+str(self.coeffs.anot0_dnot01.size()))
+            IF DEBUG:
+                logging.debug('sum(alpha_k): '+str(sum([v for v in self.coeffs.a])))
+                logging.debug('sum(delta_k): '+str(sum([v for v in self.coeffs.d])))
+ 
+        self.anot0_dnot01 = C_CACHE_LEVEL
+        self.anot0_d0 = C_CACHE_LEVEL
+        self.anot0_d1 = C_CACHE_LEVEL
+        self.a0_dnot01 = C_CACHE_LEVEL
+        self.a0_d1 = C_STAR_CACHE_LEVEL
+        self.a0_d0 = C_STAR_CACHE_LEVEL
+
+        self.initialize_ff_c()
+
+        self.calc_b_star_c()
+        self.calc_rho_c()
+
+        self.anot0_dnot01 = anot0_dnot01_
+        self.anot0_d0 = anot0_d0_
+        self.anot0_d1 = anot0_d1_
+        self.a0_dnot01 = a0_dnot01_
+        self.a0_d1 = a0_d1_
+        self.a0_d0 = a0_d0_
+
+
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing
     def fit(self, cnp.ndarray[DTYPE_t, ndim=2] X):
         IF DEBUG:
             if self.logging:
@@ -1491,7 +1626,6 @@ cdef class OCSVM_PLUS_C:
             if self.logging:
                 logging.debug('std[b_k^*]: '+str(np.std(s)))
 
-
     cdef calc_rho_c(self):
         s = []
         cdef Py_ssize_t i
@@ -1509,13 +1643,13 @@ cdef class OCSVM_PLUS_C:
                 logging.debug('std[rho_k]: '+str(np.std(s)))
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     def correcting_function(self, cnp.ndarray[DTYPE_t, ndim=2] X_star):
         IF DEBUG:
             assert(X_star.shape[1] >= self.n_features_star)
         cdef Py_ssize_t n_samples = X_star.shape[0] 
         cdef Py_ssize_t n_features = X_star.shape[1]
-        cdef DTYPE_t[::1] f_star = np.empty(n_samples, dtype=DTYPE)        
+        cdef DTYPE_t[::1] f_star = np.empty(n_samples, dtype=DTYPE)
         cdef DTYPE_t[:, ::1] X_star_ptr = X_star
         cdef Py_ssize_t i
         for i in range(n_samples):
@@ -1523,13 +1657,13 @@ cdef class OCSVM_PLUS_C:
         return f_star
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     def decision_function(self, cnp.ndarray[DTYPE_t, ndim=2] X):
         IF DEBUG:
             assert(X.shape[1] >= self.n_features)
-        cdef Py_ssize_t n_samples = X.shape[0] 
+        cdef Py_ssize_t n_samples = X.shape[0]
         cdef Py_ssize_t n_features = X.shape[1]
-        cdef DTYPE_t[::1] f = np.empty(n_samples, dtype=DTYPE)        
+        cdef DTYPE_t[::1] f = np.empty(n_samples, dtype=DTYPE)
         cdef DTYPE_t[:, ::1] Xptr = X
         cdef Py_ssize_t i
         for i in range(n_samples):
@@ -1537,7 +1671,7 @@ cdef class OCSVM_PLUS_C:
         return f
 
     @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing.
+    @cython.wraparound(False)   # Deactivate negative indexing
     def predict(self, cnp.ndarray[DTYPE_t, ndim=2] X):
         cdef DTYPE_t[::1] pred = self.decision_function(X)
         for i in range(X.shape[0]):
@@ -1553,7 +1687,7 @@ class OneClassSVM_plus(BaseEstimator):
             kernel_gamma='scale',
             kernel_star='rbf',
             kernel_star_gamma='scale',
-            nu=0.5,
+            nu=0.5,  
             gamma='auto',
             alg='best_step_2d',      # ('best_step', 'delta_pair')
             tau=0.001,
@@ -1569,7 +1703,7 @@ class OneClassSVM_plus(BaseEstimator):
         self.kernel_gamma = kernel_gamma
         self.kernel_star = kernel_star
         self.kernel_star_gamma = kernel_star_gamma
-        self.nu = nu
+        self.nu = nu 
         self.gamma = gamma
         self.alg = alg
         self.tau = tau
@@ -1577,8 +1711,8 @@ class OneClassSVM_plus(BaseEstimator):
         self.kernel_cache_size = kernel_cache_size
         self.distance_cache_size = distance_cache_size
         self.random_seed = random_seed
-        self.logging_file_name = logging_file_name
         self.max_iter = max_iter
+        self.logging_file_name = logging_file_name
         self.is_fitted_ = False
         self.model_ = None
 
@@ -1588,26 +1722,8 @@ class OneClassSVM_plus(BaseEstimator):
         if not (self.nu > 0 and self.nu < 1):
             raise ValueError("must be 0<\nu <1!")
 
-        if not self.tau > 0:
-            raise ValueError("bad input for tau!")
-
-        if not (self.kernel_cache_size >= 0 and isinstance(self.kernel_cache_size, int)):
-            raise ValueError("bad input for kernel_cache_size!")
-
-        if not (self.distance_cache_size >= 0 and isinstance(self.distance_cache_size, int)):
-            raise ValueError("bad input for distance_cache_size!")
-
-        if not (self.max_iter >= -1 and isinstance(self.max_iter, int)):
-            raise ValueError("bad input for max_iter!")
-
         if not (self.gamma == 'auto' or self.gamma > 0):
             raise ValueError("bad input for gamma!")
-
-        if not (self.kernel_gamma == 'scale' or self.kernel_gamma == 'auto' or self.kernel_gamma > 0):
-            raise ValueError("bad input for kernel_gamma!")
-
-        if not (self.kernel_star_gamma == 'scale' or self.kernel_star_gamma == 'auto' or self.kernel_star_gamma > 0):
-            raise ValueError("bad input for kernel_star_gamma!")
 
         if not (self.kernel == 'rbf' or self.kernel == 'linear' or isinstance(self.kernel, kernel)):
             raise ValueError("bad input for kernel!")
@@ -1615,15 +1731,36 @@ class OneClassSVM_plus(BaseEstimator):
         if not (self.kernel_star == 'rbf' or self.kernel_star == 'linear' or isinstance(self.kernel_star, kernel)):
             raise ValueError("bad input for kernel_star!")
 
-        if not( (isinstance(self.ff_caches, dict) and 
-                 set(self.ff_caches.keys()) == {'anot0_dnot01', 'anot0_d0', 'anot0_d1', 'a0_dnot01', 'a0_d1', 'a0_d0'} and
-                 set(self.ff_caches.values()).issubsetof({0, 1, 2})) or 
-                self.ff_caches in ['all', 'not_bound', 'not_zero']):
-            raise ValueError("bad input for ff_caches!")
+        if not (self.kernel_gamma == 'scale' or self.kernel_gamma == 'auto' or self.kernel_gamma > 0):
+            raise ValueError("bad input for kernel_gamma!")
+
+        if not (self.kernel_star_gamma == 'scale' or self.kernel_star_gamma == 'auto' or self.kernel_star_gamma > 0):
+            raise ValueError("bad input for kernel_star_gamma!")
+
+        if not (self.kernel_cache_size >= 0 and isinstance(self.kernel_cache_size, int)):
+                raise ValueError("bad input for kernel_cache_size!")
+
+        if self.alg not in ['best_step_2d', 'best_step', 'delta_pair', 'cvxopt']:
+            raise ValueError("bad input for alg!")
 
         if not (self.logging_file_name is None or isinstance(self.logging_file_name, str)):
             raise ValueError("bad input for logging_file_name!")
 
+        if self.alg != 'cvxopt':
+            if not self.tau > 0:
+                raise ValueError("bad input for tau!")
+
+            if not (self.distance_cache_size >= 0 and isinstance(self.distance_cache_size, int)):
+                raise ValueError("bad input for distance_cache_size!")
+
+            if not (self.max_iter >= -1 and isinstance(self.max_iter, int)):
+                raise ValueError("bad input for max_iter!")
+
+            if not( (isinstance(self.ff_caches, dict) and 
+                     set(self.ff_caches.keys()) == {'anot0_dnot01', 'anot0_d0', 'anot0_d1', 'a0_dnot01', 'a0_d1', 'a0_d0'} and
+                     set(self.ff_caches.values()).issubsetof({0, 1, 2})) or 
+                     self.ff_caches in ['all', 'not_bound', 'not_zero']):
+                raise ValueError("bad input for ff_caches!")
 
     def fit(self, X, y=None):
         X0 = check_array(X, dtype=DTYPE, order='C')
@@ -1667,45 +1804,47 @@ class OneClassSVM_plus(BaseEstimator):
         else:
             K_star = self.kernel_star
 
-        if self.ff_caches == 'not_bound':
-            ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 1, 'a0_d0': 1}
-        elif self.ff_caches == 'all':
-            ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 2, 'a0_d0': 2}
-        elif self.ff_caches == 'not_zero':
-            ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 2, 'a0_d0': 0}
-        else:
-            ff_caches = self.ff_caches
-
-        if self.alg == 'best_step_2d':
-            alg = ALG_BEST_STEP_2D
-        elif self.alg == 'best_step':
-            alg = ALG_BEST_STEP
-        elif self.alg == 'delta_pair':
-            alg = ALG_DELTA_STEP_PREF
-        else:
-            raise ValueError("bad input for alg!")
-
         if self.logging_file_name == 'uuid':
             self.logging_file_name = uuid.uuid4().hex+'.log'
         elif self.logging_file_name == 'time':
             self.logging_file_name = datetime.datetime.today().strftime("%Y-%m-%d-%H-%M-%S-%f")+'.log'
 
+        if self.alg != 'cvxopt': 
+            if self.ff_caches == 'not_bound':
+                ff_caches = {'anot0_dnot01': C_CACHE_LEVEL, 'anot0_d0': C_CACHE_LEVEL, 'anot0_d1': C_CACHE_LEVEL, 'a0_dnot01': C_CACHE_LEVEL, 
+                             'a0_d1': C_STAR_CACHE_LEVEL, 'a0_d0': C_STAR_CACHE_LEVEL}
+            elif self.ff_caches == 'all':
+                ff_caches = {'anot0_dnot01': C_CACHE_LEVEL, 'anot0_d0': C_CACHE_LEVEL, 'anot0_d1': C_CACHE_LEVEL, 'a0_dnot01': C_CACHE_LEVEL, 'a0_d1': C_CACHE_LEVEL, 'a0_d0': C_CACHE_LEVEL}
+            elif self.ff_caches == 'not_zero':
+                ff_caches = {'anot0_dnot01': C_CACHE_LEVEL, 'anot0_d0': C_CACHE_LEVEL, 'anot0_d1': C_CACHE_LEVEL, 'a0_dnot01': C_CACHE_LEVEL, 'a0_d1': C_CACHE_LEVEL, 'a0_d0': ALL_ELEM_LEVEL}
+            else:
+                ff_caches = self.ff_caches
 
-        self.model_ = OCSVM_PLUS_C(n_features=self.n_features,
-                                   nu=self.nu,
-                                   gamma=gamma,
-                                   tau=self.tau,
-                                   K=K,
-                                   K_star=K_star,
-                                   k_cache_size=self.kernel_cache_size,
-                                   kii_ij_jj_cache_size=self.distance_cache_size,
-                                   ff_caches=ff_caches,
-                                   alg=alg,
-                                   max_iter=self.max_iter,
-                                   random_seed=self.random_seed,
-                                   logging_file_name=self.logging_file_name)
+            self.model_ = OCSVM_PLUS_C(n_features=self.n_features,
+                                       nu=self.nu,
+                                       gamma=gamma,
+                                       tau=self.tau,
+                                       K=K,
+                                       K_star=K_star,
+                                       k_cache_size=self.kernel_cache_size,
+                                       kii_ij_jj_cache_size=self.distance_cache_size,
+                                       ff_caches=ff_caches,
+                                       alg={'best_step_2d': ALG_BEST_STEP_2D, 'best_step': ALG_BEST_STEP, 'delta_pair': ALG_DELTA_STEP_PREF}[self.alg],
+                                       max_iter=self.max_iter,
+                                       random_seed=self.random_seed,
+                                       logging_file_name=self.logging_file_name)
+            self.model_.fit(X0)
+        else: # CVXOPT, for comparison
+            self.model_ = OCSVM_PLUS_C(n_features=self.n_features,
+                                       nu=self.nu,
+                                       gamma=gamma,
+                                       tau=NP_NAN,
+                                       K=K,
+                                       K_star=K_star,
+                                       k_cache_size=self.kernel_cache_size,
+                                       logging_file_name=self.logging_file_name)
+            self.model_.fit_interior_point(X0)
 
-        self.model_.fit(X0)
         self.is_fitted_ = True
         return self
 
@@ -1748,7 +1887,7 @@ class OneClassSVM_plus(BaseEstimator):
 
     @property
     def fit_status_(self):
-        return self.alpha_support_.size > 0 and self.delta_support_.size > 0
+        return self.alpha_support_.size > 0 and self.delta_support_.size > 0 # self.alpha_support_.size > 0 is always satisfied
 
     @property
     def alpha_support_(self):
