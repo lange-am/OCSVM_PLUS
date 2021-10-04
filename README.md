@@ -30,7 +30,7 @@ The debug version performs assertions, obtains intermediate results in different
 class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale', 
                                   kernel_star='rbf', kernel_star_gamma='scale', 
                                   nu=0.5, gamma='auto', tau=0.001, 
-                                  alg='best_step_2d', ff_caches='not_bound', 
+                                  alg='best_step', ff_caches='not_bound', 
                                   kernel_cache_size=0, distance_cache_size=0, 
                                   max_iter=-1, random_seed=None, 
                                   logging_file_name=None)
