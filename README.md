@@ -128,7 +128,7 @@ for title, model in [('One-Class nu-SVM', ocsvm),
 ![alt text](ocsvm.png)
 ![alt text](ocsvm+.png)
 
-OCSVM+ models the domain boundary distances (slack  variables `xi` in the original `nu`-SVM, which characterize the measure of data point anomality) through parameterization with privileged features. In this example, the points to the left of the origin have a chaotic priviliged coordinate, while the points to the right are close in priviliged space. Such privileged information shifts approximated domain to the right, because the left points show higher anomality. For OCSVM `nu=0.5` is both the upper bound of the fraction of anomalies and the lower bound of the fraction of support vectors. For OCSVM+ `nu` is still the upper bound of the fraction of anomalies, but no longer the lower bound of the fraction of support vectors.
+OCSVM+ models the domain boundary distances (slack  variables `xi` in the original `nu`-SVM, which characterize the measure of data point anomality) through parameterization with privileged features. In this example, the points to the left of the origin have a chaotic priviliged coordinate, while the points to the right are close in priviliged space. Such privileged information shifts approximated domain to the right, because the left points show higher anomality. For OCSVM the parameter `nu=0.5` is both the upper bound of the fraction of anomalies and the lower bound of the fraction of support vectors. For OCSVM+ `nu` is still the upper bound of the fraction of anomalies, but no longer the lower bound of the fraction of support vectors.
 
 ## Third party software
 STLCACHE library https://github.com/akashihi/stlcache is used for caching the values of kernel functions, many thanks to the authors.
