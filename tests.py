@@ -1,10 +1,6 @@
 # All unit tests
 #
 # Copyright (C) 2021 Andrey M. Lange, 
-# Skoltech, https://crei.skoltech.ru/cdise
-# Distributed under the Boost Software License, Version 1.0.
-# (See accompanying file LICENSE_1_0.txt or copy at 
-# http://www.boost.org/LICENSE_1_0.txt)
 
 import unittest
 import numpy as np
@@ -15,6 +11,7 @@ LOG = True
 DEEP_LOG = False
 DEEP_DEEP_LOG = False
 CMP_TOL = 1e-10
+
 
 class TestSTLCache(unittest.TestCase):  # test stlcache library, different cache policies
     def test_lru_lfu(self):

@@ -4,7 +4,7 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 //
-// Changed by Andrey M Lange, Skoltech, 
+// Changed by Andrey M. Lange
 //
 
 
@@ -287,7 +287,7 @@ namespace stlcache {
          * 
          *   \return A pair <(bool) does element present, data value>.
          * 
-         *   \author A.Lange - Skoltech (15 June 2021)
+         *   \author A.Lange (15 June 2021)
          */
         find_pair_type find(const Key& _k) const {
             const_iterator it = _storage.find(_k);
@@ -307,7 +307,7 @@ namespace stlcache {
          *      }
          *  \endcode
          * 
-         *  \author A.Lange - Skoltech (15 June 2021)
+         *  \author A.Lange (15 June 2021)
          */
         find_pair_type recorded_find(const Key& _k) {
             return this->_recorded_find(_k);
@@ -376,7 +376,7 @@ namespace stlcache {
         }
         //@}
     protected:
-        // added by A.Lange - Skoltech
+        // added by A.Lange
         find_pair_type _recorded_find(const Key& _k) throw() {
             _policy->touch(_k);
             const_iterator it = _storage.find(_k);
