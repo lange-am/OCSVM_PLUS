@@ -23,10 +23,10 @@
 
 using namespace std;
 
-#include <stlcache/exceptions.hpp>
-#include <stlcache/policy.hpp>
-#include <stlcache/policy_lru.hpp>
-#include <stlcache/policy_lfu.hpp>
+#include "exceptions.hpp"
+#include "policy.hpp"
+#include "policy_lru.hpp"
+#include "policy_lfu.hpp"
 
 namespace stlcache {
 

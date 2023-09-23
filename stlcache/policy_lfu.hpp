@@ -14,7 +14,7 @@
 #include <map>
 #include <iostream>
 
-#include <stlcache/policy.hpp>
+#include "policy.hpp"
 
 namespace stlcache {
     template <class Key,template <typename T> class Allocator> class _policy_lfu_type : public policy<Key,Allocator> {

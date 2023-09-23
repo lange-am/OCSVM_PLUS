@@ -12,8 +12,8 @@
 
 using namespace std;
 
-#include <stlcache/exceptions.hpp>
-#include <stlcache/victim.hpp>
+#include "exceptions.hpp"
+#include "victim.hpp"
 
 namespace stlcache {
     /*! \brief Abstract interface of a cache entries expiration policy.

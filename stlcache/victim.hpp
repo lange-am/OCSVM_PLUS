@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#include <stlcache/exceptions.hpp>
+#include "exceptions.hpp"
 
 namespace stlcache {
     /*!
