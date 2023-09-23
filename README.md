@@ -12,8 +12,9 @@ You can just download the repository to your folder. Then from its root director
 After that, you can import the library from Python:
 
 `>>> import ocsvm_plus`
-cvxop
-Make sure you are using Python 3.x (you may need "python3" instead of "python"). You will also need Cython installed (`pip install Cython` or similar). CVXOPT is needed for comparison (`pip install cvxopt`). To be more confident, you should run unit tests:
+
+% apt install texlive-latex-extra
+Make sure you are using Python 3.x (you may need "python3" instead of "python"). You will also need Cython installed (`pip install Cython` or similar). CVXOPT is needed for comparison (`pip install cvxopt`). Also, To be more confident, you should run unit tests:
 
 `python setup_debug.py build_ext --inplace`<br/>
 `python -m unittest tests`
