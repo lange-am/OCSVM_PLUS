@@ -1,8 +1,10 @@
 # OCSVM+: One-Class SVM with Privileged Information module build
 #
-# Copyright (C) 2021 Andrey M. Lange, 
+# Copyright (C) 2021 Andrey M. Lange
+# Distributed under the Boost Software License, Version 1.0.
+# See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt.
 
-# run this: python setup_debug.py build_ext --inplace
+# run this: python setup.py build_ext --inplace
 
 from setuptools import Extension, setup
 from Cython.Build import cythonize

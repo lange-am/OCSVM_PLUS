@@ -1,6 +1,8 @@
 # OCSVM+: One-Class SVM with Privileged Information model
 #
-# Copyright (C) 2021 Andrey M. Lange, 
+# Copyright (C) 2021 Andrey M. Lange
+# Distributed under the Boost Software License, Version 1.0.
+# See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt.
 
 # cython: language_level=3, boundscheck=False, wraparound=False, nonecheck=False, cdivision=True, nonecheck=False, initializedcheck=False
 # distutils: language = c++
@@ -20,8 +22,6 @@ from libc.math cimport exp as cexp, isnan
 from libcpp.set cimport set as cset
 from libcpp.pair cimport pair as cpair
 from libcpp.vector cimport vector as cvector
-from cvxopt import matrix, solvers                 # Temporary, for comparison
-
 cimport stlcache
 
 from sklearn.base import BaseEstimator
@@ -1355,6 +1355,8 @@ cdef class OCSVM_PLUS_C:
         cdef DTYPE_t* y_star
         cdef Py_ssize_t i, j
 
+        from cvxopt import matrix, solvers  # Optional dependency, used only for comparison.
+
         self.X = X
         self.n_samples = X.shape[0]
         self.nu_nsamples = self.nu * self.n_samples
@@ -1712,6 +1714,9 @@ class OneClassSVM_plus(BaseEstimator):
         self.is_fitted_ = False
         self.model_ = None
 
+        self._check_params()
+
+    def _check_params(self):
         if not (self.n_features > 0 and isinstance(self.n_features, int)):
             raise ValueError("n_features must be positive integer!")
 
@@ -1734,7 +1739,7 @@ class OneClassSVM_plus(BaseEstimator):
             raise ValueError("bad input for kernel_star_gamma!")
 
         if not (self.kernel_cache_size >= 0 and isinstance(self.kernel_cache_size, int)):
-                raise ValueError("bad input for kernel_cache_size!")
+            raise ValueError("bad input for kernel_cache_size!")
 
         if self.alg not in ['best_step_2d', 'best_step', 'delta_pair', 'cvxopt']:
             raise ValueError("bad input for alg!")
@@ -1754,11 +1759,13 @@ class OneClassSVM_plus(BaseEstimator):
 
             if not( (isinstance(self.ff_caches, dict) and 
                      set(self.ff_caches.keys()) == {'anot0_dnot01', 'anot0_d0', 'anot0_d1', 'a0_dnot01', 'a0_d1', 'a0_d0'} and
-                     set(self.ff_caches.values()).issubsetof({0, 1, 2})) or 
+                     set(self.ff_caches.values()).issubset({0, 1, 2})) or 
                      self.ff_caches in ['all', 'not_bound', 'not_zero']):
                 raise ValueError("bad input for ff_caches!")
 
     def fit(self, X, y=None):
+        self._check_params()
+
         X0 = check_array(X, dtype=DTYPE, order='C')
         if not self.n_features < X0.shape[1]:
             raise ValueError("number of features in X must be greater than n_features!")
@@ -1894,6 +1901,7 @@ class OneClassSVM_plus(BaseEstimator):
     def delta_support_(self):
         coeffs = self.model_.coeffs
         return np.array(sorted(list(coeffs.anot0_dnot01) + list(coeffs.a0_dnot01)))
+
 
 if __name__ == "__main__":
     pass

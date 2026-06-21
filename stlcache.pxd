@@ -1,6 +1,8 @@
-# Cython interface to some from STLCACHE external library 
-# 
-# Copyright (C) 2021 Andrey M. Lange, 
+# Cython interface to the STLCACHE external library
+#
+# Copyright (C) 2021 Andrey M. Lange
+# Distributed under the Boost Software License, Version 1.0.
+# See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt.
 
 # cython: language_level=3, boundscheck=False, wraparound=False
 

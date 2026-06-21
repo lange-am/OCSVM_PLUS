@@ -1,6 +1,8 @@
 # All unit tests
 #
-# Copyright (C) 2021 Andrey M. Lange, 
+# Copyright (C) 2021 Andrey M. Lange
+# Distributed under the Boost Software License, Version 1.0.
+# See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt.
 
 import unittest
 import numpy as np
