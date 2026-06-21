@@ -10,6 +10,14 @@ The implementation accompanies the IEEE Access article:
 
 Article link: https://ieeexplore.ieee.org/document/10314493
 
+## Method illustration
+
+The synthetic example in the experiments notebook illustrates how privileged information changes the learned domain compared with the standard one-class `nu`-SVM:
+
+![One-Class nu-SVM decision boundary](ocsvm.png)
+
+![OCSVM+ decision boundary with privileged information](ocsvm+.png)
+
 ## Main features
 
 - One-class SVM with privileged information (OCSVM+) for anomaly and novelty detection.
@@ -103,6 +111,7 @@ corrections = model.correcting_function(X_star)
 print(scores[:5])
 print(labels[:5])
 ```
+
 
 ## API
 
