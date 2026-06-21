@@ -10,6 +10,39 @@ The implementation accompanies the IEEE Access article:
 
 Article link: https://ieeexplore.ieee.org/document/10314493
 
+## Method illustration
+
+The two figures below illustrate the synthetic experiment discussed in the paper.
+The original observations live in a two-dimensional decision space.
+In the paper, the base cloud is described as a sample from a two-dimensional standard normal distribution, augmented with two artificial outliers.
+During training, each observation also has one extra privileged feature `x_star`.
+This third coordinate is not used when predicting new samples; it is available only to guide the training procedure.
+
+The privileged coordinate is constructed as a teacher's hint about which part of the original space should look more anomalous.
+For points to the right of the origin, `x_star` is an ordinary small value drawn near zero, from a normal distribution with standard deviation `0.1`.
+For points to the left of the origin, `x_star` has a large magnitude and is drawn far from zero.
+Thus, in the privileged space, left-side points look much more suspicious than right-side points, although the final domain boundary must still be drawn only in the original two-dimensional feature space.
+
+A standard one-class `nu`-SVM sees only the two original coordinates, so it learns a domain around the Gaussian cloud without this additional hint.
+OCSVM+ receives the training-time signal that the left-side points are more anomalous.
+It transfers this information from the privileged space to the original decision space: the accepted domain shifts to the right, and many left-side points that would remain inliers for ordinary OC-SVM become outliers.
+The strength of this shift is controlled by the privileged regularization parameter `gamma` and the privileged-kernel parameter: smaller values make the privileged signal more influential.
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="ocsvm.png" alt="One-Class nu-SVM decision boundary" width="100%" />
+    </td>
+    <td align="center" width="50%">
+      <img src="ocsvm+.png" alt="OCSVM+ decision boundary with privileged information" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><em>Standard one-class <code>nu</code>-SVM: the boundary is learned only from the original two-dimensional features.</em></td>
+    <td align="center"><em>OCSVM+: the training-time privileged feature marks left-side points as more anomalous, so the learned domain moves to the right.</em></td>
+  </tr>
+</table>
+
 ## Main features
 
 - One-class SVM with privileged information (OCSVM+) for anomaly and novelty detection.
@@ -103,6 +136,7 @@ corrections = model.correcting_function(X_star)
 print(scores[:5])
 print(labels[:5])
 ```
+
 
 ## API
 
