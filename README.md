@@ -1,134 +1,206 @@
-# One-Class SVM+
+# OCSVM+: One-Class SVM with Privileged Information
 
-Unsupervised outlier detection with *privileged information*. Generalizes one-class *`nu`*-SVM that estimates the support of a high-dimensional distribution by accounting for additional (privileged) set of features available in the training phase but not available in evaluating and predicting new data (for example, future time series behavior). 
+OCSVM+ is a Cython implementation of a one-class support vector machine with privileged information.
+It extends the standard one-class `nu`-SVM to the LUPI setting, where additional features are available during training but are not available at prediction time.
+The model learns the decision boundary in the original feature space and uses the privileged feature space only through the training-time correcting function.
 
-Along with the current SVM models, it solves dual optimization problem with respect to unknown coefficients with *Sequential Minimal Optimization*. SMO finds the two coefficients that violate Karush-Kuhn-Tucker conditions the most, and shifts them in opposite directions keeping their sum constant. The optimization procedure converges to a `tau` -approximate solution, which means that the KKT conditions are satisfied with the tolerance of `tau`.
+The implementation accompanies the IEEE Access article:
 
-# Installation
-You can just download the repository to your folder. Then from its root directory (where `setup.py` is located) run on the command line
+> A. Lange, D. Smolyakov, and E. Burnaev, "Sequential Minimal Optimization Algorithm for One-Class Support Vector Machines With Privileged Information," *IEEE Access*, vol. 11, pp. 128106-128124, 2023, doi: 10.1109/ACCESS.2023.3331685.
 
-`python setup.py build_ext --inplace`
+Article link: https://ieeexplore.ieee.org/document/10314493
 
-After that, you can import the library from Python:
+## Main features
 
-`>>> import ocsvm_plus`
+- One-class SVM with privileged information (OCSVM+) for anomaly and novelty detection.
+- Sequential Minimal Optimization (SMO) solver for the OCSVM+ dual problem.
+- CVXOPT-based interior-point solver for comparison experiments.
+- Separate kernels for original and privileged features.
+- Basic scikit-learn estimator interface: `fit`, `decision_function`, `predict`, and use in `GridSearchCV` with an explicit scoring function.
+- Kernel and distance caching options for performance experiments.
 
-Make sure you are using Python 3.x (you may need "python3" instead of "python"). You will also need Cython installed (`pip install Cython` or similar). CVXOPT is needed for comparison (`pip install cvxopt`). To be more confident, you should run unit tests:
+## Installation
 
-`python setup_debug.py build_ext --inplace`<br/>
-`python -m unittest tests`
+Clone or download the repository, then build the Cython extension in place from the repository root:
 
-Now debug version is also available:
+```bash
+python -m pip install numpy scikit-learn Cython cvxopt
+python setup.py build_ext --inplace
+```
 
-`>>> import ocsvm_plus_debug`
+The current module imports CVXOPT at import time, so CVXOPT should be installed even if only the SMO solver is used.
 
-The debug version performs assertions, obtains intermediate results in different ways and checks their equivalence, dumps more detailed info to the log file. It works much slower than basic (release) version.
+The Cython module uses the STLCACHE C++/Cython declarations for caching kernel values.
+The file `stlcache.pxd` includes the C++ header as `stlcache/stlcache.hpp`; therefore the STLCACHE headers should be available in this layout relative to the repository root, or through an equivalent compiler include path:
 
-# API
+```text
+stlcache.pxd
+stlcache/stlcache.hpp
+stlcache/policy.hpp
+stlcache/policy_lru.hpp
+stlcache/policy_lfu.hpp
+stlcache/victim.hpp
+stlcache/exceptions.hpp
+```
+
+After a successful build, the module can be imported as follows:
 
 ```python
-class ocsvm_plus.OneClassSVM_plus(n_features, kernel='rbf', kernel_gamma='scale', 
-                                  kernel_star='rbf', kernel_star_gamma='scale', 
-                                  nu=0.5, gamma='auto', tau=0.001, 
-                                  alg='best_step', ff_caches='not_bound', 
-                                  kernel_cache_size=0, distance_cache_size=0, 
-                                  max_iter=-1, random_seed=None, 
-                                  logging_file_name=None)
+from ocsvm_plus import OneClassSVM_plus
 ```
 
-## Parameters
+### Tests
 
-| **Parameters:**                                                                                              |  **Description**                                       |
-| :-------                                                                                                     | :-------                                               |
-| <strong>n_features: *int*</strong>                                                                           | Number of original features.                           |
-| <strong>kernel: *{'rbf', 'linear'} or a class derived from ocsvm_plus.kernel, default='rbf'*</strong>        | Kernel K for original features `X`.                    |
-| <strong>kernel_gamma: *{'scale', 'auto'} or float, default='scale'*</strong>                                 | Kernel coefficient if K is 'rbf'. For `kernel_gamma='scale'` (default) it uses `kernel_gamma=1/(n_features*X.var())` as value of `kernel_gamma`. For 'auto' it uses `kernel_gamma=1/n_features`. |
-| <strong>kernel_star: *{'rbf', 'linear'} or a class derived from ocsvm_plus.kernel, default='rbf'*</strong>   | Kernel K* for privileged features `X_star`.            |
-| <strong>kernel_star_gamma: *{'scale', 'auto'} or float, default='scale'*</strong>                            | Kernel coefficient if K* is 'rbf'. For `kernel_star_gamma='scale'` (default) it uses `kernel_star_gamma=1/(n_features_star*X_star.var())` as value of `kernel_star_gamma`. For 'auto' it uses `kernel_star_gamma=1/n_features_star`.     |
-| <strong>nu: *float, default=0.5*</strong>                                                                    | Parameter of `nu`-SVM, original features regularizer, should be between (0, 1). |
-| <strong>gamma: *'auto' or float, default='auto'*</strong>                                                    | Privileged features regularizer. For `gamma='auto'` it uses `gamma=nu*n_samples`. |
-| <strong>tau: *float, default=0.001*</strong>                                                                 | Tolerance for stopping criterion.                |
-| <strong>alg: *{'best_step_2d', 'best_step', 'delta_pair', 'cvxopt'}, default='best_step'*</strong>           | Mode for optimization procedure, affects processing time. <br/> <br />  For `'delta_pair'` the algorithm tries to find the most `delta`-violating pair of privileged coefficients and, if no `delta`-pairs remained, then it looks for `alpha`-violating pair of original coefficients. Although `delta`-optimization step for a given `delta`-pair is cheaper in time than `alpha`-step for a pair of `alpha`-coefficients (due to decision and correcting function updates), this option usually demonstrates slow convergence. `'best_step'` tries to find both the most (worst) `alpha`- and the most `delta`-violating pairs and the most violating one is selected for the optimization step. `'best_step_2d'` is similar to `'best_step'`, but if the selected pair is also a violating pair according to another criterion (not necessarily being the most violating), then the two-dimensional optimization is applied (for example, if the most violating pair is `alpha`-pair of examples `ij` and `delta` KKT condition is also violated, then the shift for two coefficients `alpha_ij` and a shift for two coefficients `delta_ij` are found together). `'best_step_2d'` and `'best_step'` may demonstrate comparable fastness, because the optimization of two pairs of coefficients at once is at the same time more computationally expensive. <br/> <br /> `cvxopt` uses the general-purpose quadratic optimization solver CVXOPT, based on interior-point methods, which are less memory and time efficient compared to SMO. Added for comparison tests.|
-| <strong>ff_caches: *{'all', 'not_bound', 'not_zero'}, default='not_bound'*</strong>                          | Sets ranges for caches of indices of training examples `C` and `C*` for which the values of decision `f(x_i)` and correcting `f*(x*_i)` functions (without their intercepts `–rho` and `b*`) are kept actual on every iteration using simple updates (by subtract old pair of coefficients and add new ones) and without need to full recalculation (summing over all non-zero coefficients). Affects processing time of the optimization procedure. `alpha`-pair is selected over `C`, `delta`-pair is over `C*`. A wider cache provides a better selection of violation pairs and less costly function recalculations, while a smaller cache results in faster search for violation pairs and fewer updated f (x_i) and f * (x *_i). <br /> <br /> `'all'`: both caches include all training examples. `'not_bound'`: `C` includes elements `i` for which `alpha_i>0` or `0<delta_i<1`, `C*` includes all elements. `'not_zero'`: `C` and `C*` covers all elements except those who has both `alpha_i` and `delta_i` zero. Generally, `ff_cache` is a dict with keys `'anot0_dnot01'`, `'anot0_d0'`, `'anot0_d1'`, `'a0_dnot01'`, `'a0_d1'`, `'a0_d0'`, corresponding to six subsets of elements (respectively, `alpha_i>0`, `0<delta_i<1`; `alpha_i>0`, `delta_i=0`; `alpha_i>0`, `delta_i=1`; `alpha_i=0`, `0<delta_i<1`; `alpha_i=0`, `delta_i=1` and `alpha_i=0`, `delta_i=0`) and key values: 2 – a subset belongs to both `C` and `C*`, or 1 - belongs only to `C*`, or 0 - not in caches (`'all'` is equivalent to all key values are 2, `'not_zero'` - all key values are 2 except `ff_cache['a0_d0']=0`, `'not_bound'` is equivalent to `ff_caches = {'anot0_dnot01': 2, 'anot0_d0': 2, 'anot0_d1': 2, 'a0_dnot01': 2, 'a0_d1': 1, 'a0_d0': 1}`).|
-| <strong>kernel_cache_size: *int, default=0*</strong>                                                         | Size of a cache (number of elements) to store K and K* values according to LRU policy. If 0, then the  kernels K(x_i, x_j) and K*(x*_i, x*_j) are calculated only once and stored as ij-elements of triangular matrices. Limited cache size is memory-efficient, while 0 is the most time-efficient setting. |
-| <strong>distance_cache_size: *int, default=0*</strong>                                                       | Size of a cache (number of elements) to store values (K_ii-2K_ij+K_jj)/(nu * n_samples) and (K*_ii-2K*_ij+K*_jj)/gamma, LRU policy is used. If 0, then once a value is calculated, it is stored in triangular matrix. Limited cache size is memory-efficient, while 0 is the most time-efficient setting.|
-| <strong>max_iter: *int, default=-1*</strong>                                                               | Hard limit on iterations within solver, or -1 for no limit. |
-| <strong>random_seed: *int or None, default=None*</strong>                                                  | Random generator initialization for test repeatability.|
-| <strong>logging_file_name: *str, 'uuid', 'time' or None, default=None*</strong>                            | Text file name to dump intermediate results of iterative process of model training. If None, then no logging is performed. For `'uuid'` the filename is set to an universally unique identifier, for example, `592541c44ae044b3a3f24119b1951e63.log`. For `'time'` it is set to current time, i.e. `YYYY-mm-dd-HH-MM-SS-ffffff.log`.|
+The `tests.py` file targets the debug module `ocsvm_plus_debug`.
+The debug build script builds both `test_stlcache` and `ocsvm_plus_debug`, so run it before the unit tests:
 
-## Attributes
-
-| **Attributes:**    | **Description**                                           |
-| :-------           | :-------                                                  |
-| **alphas_**        | Dual coefficients `alpha_i`.                              |
-| **deltas_**        | Dual coefficients `delta_i`.                              |
-| **rho_**           | Decision function intercept.                              |
-| **b_star_**        | Correcting function intercept.                            |
-| **alpha_support_** | Indices `i` of training examples such that `alpha_i>0`.   |
-| **delta_support_** | Indices `i` of training examples such that `0<delta_i<1`. |
-| **fit_status_**    | Returns `True` if there were at least one non-bound coefficient `0<delta_k<1` to correctly find intercepts `rho` and `b_star`. Otherwise, `b_star=-(f^*(x_m^*)+f^*(x_n^*))/2`, where `mn` is `delta`-pair. In this case `fit_status_` is set to `False`, and one should make `tau` smaller and/or increase `max_iter`.|
-
-## Methods
-
-|**Methods:**                  |**Description**|
-| :-------                     | :-------      |
-|`fit(Xall[, y=None])`         | Detects the soft boundary of the set of original vectors `X[n_samples, n_features]` accounting for privileged vectors `X_star[n_samples, n_features_star]`, where `Xall=[n_samples, n_features + n_features_star]` comprises `X` in the first `n_features` columns and `X_star` in the last `n_features_star` columns. `Xall` is array-like, if not C-ordered contiguous array it is copied, `y` is ignored. Returns `self`.|
-|`decision_function(X)`        | Signed distance to the separating hyperplane in original feature space, positive for an inlier and negative for an outlier points. `X` is array-like, if not C-ordered contiguous array it is copied. First `n_features` columns are used, other columns are ignored. Returns `ndarray` of shape `(X.shape[0], )`. |
-|`correcting_function(X_star)` | Slack variables modelled using privileged features. `X_star` is array-like, if not C-ordered contiguous array it is copied. Last `n_features_star` columns are used as privileged vectors, other columns are ignored. Returns `ndarray` of shape `(X_star.shape[0], )`. |
-|`predict(X)`                  | Perform classification on samples in `X`. Similar to `decision_function(X)`, but the output is +1 if the decision function is positive and -1 otherwise.|
-
-## Examples
-
+```bash
+python setup_debug.py build_ext --inplace
+python -m unittest tests
 ```
-xx, yy = np.meshgrid(np.linspace(-3, 3, 500), np.linspace(-3, 3, 500))
-np.random.seed(0)
-X = 0.5*np.random.randn(200, 2)
-X[-2:, :] = [[-2.5, 0], [2.5, 0]] # set left and right outliers
 
-# OCSVM
-ocsvm = OneClassSVM(nu=0.5, gamma=0.1).fit(X)
+The debug build performs additional assertions and consistency checks and is expected to be much slower than the release build.
 
-# OCSVM+
+## Quick start
+
+`fit` expects a single matrix whose first `n_features` columns are the original features and whose remaining columns are the privileged features.
+After fitting, `decision_function` and `predict` need only the original features.
+
+```python
+import numpy as np
+from ocsvm_plus import OneClassSVM_plus
+
+rng = np.random.RandomState(0)
+
+# Original features available both at training and prediction time.
+X = 0.5 * rng.randn(200, 2)
+X[-2:, :] = [[-2.5, 0.0], [2.5, 0.0]]
+
+# Privileged features available only during training.
 left = X[:, 0] < 0
 X_star = np.empty((X.shape[0], 1))
-X_star[~left] = 0.1*np.random.randn(X[~left].shape[0], 1) # right points spaced closely in privileged space
-X_star[left] = (2*np.random.rand(X[left].shape[0], 1)-1) * 100
-X_star[left] = X_star[left] + 10*np.sign(X_star[left])    # left points spaced chaotically in privileged space, (-110, -10) or (10, 110)
-ocsvm_plus = OneClassSVM_plus(n_features=2, nu=0.5, gamma=0.1, kernel_gamma=0.1, kernel_star_gamma=0.1, tau=1e-3).fit(np.hstack((X, X_star)))
+X_star[~left] = 0.1 * rng.randn((~left).sum(), 1)
+X_star[left] = (2.0 * rng.rand(left.sum(), 1) - 1.0) * 100.0
+X_star[left] += 10.0 * np.sign(X_star[left])
 
-for title, model in [('One-Class nu-SVM', ocsvm),
-                     ('One-Class nu-SVM+ \n when left points are anomalies in privileged space', ocsvm_plus)]:
-    plt.figure()
-    plt.gca().set_title(title)
+X_train = np.hstack((X, X_star))
 
-    Z = model.decision_function(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
-    plt.contourf(xx, yy, Z, levels=np.linspace(Z.min(), 0, 7), cmap=plt.cm.PuBu)
-    plt.contourf(xx, yy, Z, levels=[0, Z.max()], colors='palevioletred')
-    plt.contour(xx, yy, Z, levels=[0], linewidths=2, colors='darkred')
+model = OneClassSVM_plus(
+    n_features=2,
+    nu=0.5,
+    gamma=0.1,
+    kernel_gamma=0.1,
+    kernel_star_gamma=0.1,
+)
+model.fit(X_train)
 
-    if 'One-Class nu-SVM+' in title:
-        if model.fit_status_:
-            plt.scatter(X[model.alpha_support_, 0], X[model.alpha_support_, 1], c='r',  s=100, edgecolors='r', label='alpha_i>0', marker='s')
-            
-            delta0 = [i for i in range(X.shape[0]) if model.deltas_[i] < 1e-05 and i not in model.delta_support_]
-            plt.scatter(X[delta0, 0], X[delta0, 1], c='w', s=60, edgecolors='k', label='delta_i=0')
-                        
-            plt.scatter(X[model.delta_support_, 0], X[model.delta_support_, 1], c='g', s=70, edgecolors='k', label='0<delta_i<1')
-            
-            delta1 = [i for i in range(X.shape[0]) if model.deltas_[i] > 1-1e-05 and i not in model.delta_support_]
-            plt.scatter(X[delta1, 0], X[delta1, 1], c='orange', s=70, edgecolors='k', label='delta_i=1')
-    else: # OCSVM
-        plt.scatter(X[model.support_, 0], X[model.support_, 1], c='r',  s=80, edgecolors='k', label='alpha_i>0', marker='s')
-        
-        alpha0 = [i for i in range(X.shape[0]) if i not in model.support_]
-        plt.scatter(X[alpha0, 0], X[alpha0, 1], c='lightgrey',  s=70, edgecolors='k', label='alpha_i=0')
-        
-    plt.gca().legend()
+scores = model.decision_function(X)  # positive means inlier, negative means outlier
+labels = model.predict(X)            # +1 for inliers, -1 for outliers
+# The correcting function is a training-time diagnostic, because X_star is
+# not assumed to be available for new prediction-time samples.
+corrections = model.correcting_function(X_star)
+
+print(scores[:5])
+print(labels[:5])
 ```
-![alt text](ocsvm.png)
-![alt text](ocsvm+.png)
 
-OCSVM+ models the domain boundary distances (slack  variables `xi` in the original `nu`-SVM, which characterize the measure of data point anomality) through parameterization with privileged features. In this example, the points to the left of the origin have a chaotic priviliged coordinate, while the points to the right are close in priviliged space. Such privileged information shifts approximated domain to the right, because the left points show higher anomality. For OCSVM the parameter `nu=0.5` is both the upper bound of the fraction of anomalies and the lower bound of the fraction of support vectors. For OCSVM+ `nu` is still the upper bound of the fraction of anomalies, but no longer the lower bound of the fraction of support vectors.
+## API
 
-## Third party software
-STLCACHE library https://github.com/akashihi/stlcache is used for caching the values of kernel functions, many thanks to the authors.
+```python
+class ocsvm_plus.OneClassSVM_plus(
+    n_features,
+    kernel='rbf',
+    kernel_gamma='scale',
+    kernel_star='rbf',
+    kernel_star_gamma='scale',
+    nu=0.5,
+    gamma='auto',
+    alg='best_step_2d',
+    tau=0.001,
+    ff_caches='not_bound',
+    kernel_cache_size=0,
+    distance_cache_size=0,
+    max_iter=-1,
+    random_seed=None,
+    logging_file_name=None,
+)
+```
+
+### Parameters
+
+| Parameter | Description |
+| --- | --- |
+| `n_features` | Number of original features. The remaining columns passed to `fit` are treated as privileged features. |
+| `kernel` | Kernel for original features. Supported values are `'rbf'`, `'linear'`, or a custom class derived from `ocsvm_plus.kernel`. Default: `'rbf'`. |
+| `kernel_gamma` | RBF coefficient for `kernel`. Use `'scale'`, `'auto'`, or a positive float. For `'scale'`, the value is `1 / (n_features * X.var())`; for `'auto'`, it is `1 / n_features`. Default: `'scale'`. |
+| `kernel_star` | Kernel for privileged features. Supported values are `'rbf'`, `'linear'`, or a custom class derived from `ocsvm_plus.kernel`. Default: `'rbf'`. |
+| `kernel_star_gamma` | RBF coefficient for `kernel_star`. Use `'scale'`, `'auto'`, or a positive float. For `'scale'`, the value is `1 / (n_features_star * X_star.var())`; for `'auto'`, it is `1 / n_features_star`. Default: `'scale'`. |
+| `nu` | One-class SVM regularization parameter. Must satisfy `0 < nu < 1`. Default: `0.5`. |
+| `gamma` | Regularization parameter for the privileged-feature correcting function. Use `'auto'` or a positive float. For `'auto'`, the value is `nu * n_samples`. Default: `'auto'`. |
+| `alg` | Optimization algorithm. Supported values are `'best_step_2d'`, `'best_step'`, `'delta_pair'`, and `'cvxopt'`. Default: `'best_step_2d'`. |
+| `tau` | Stopping tolerance for SMO algorithms. Default: `0.001`. Ignored by `alg='cvxopt'`. |
+| `ff_caches` | Cache rule for maintaining current values of the decision and correcting functions. Supported presets are `'all'`, `'not_bound'`, and `'not_zero'`; a low-level dictionary form is also accepted. Default: `'not_bound'`. |
+| `kernel_cache_size` | LRU cache size for kernel values. If `0`, kernel values are stored in triangular matrices after first calculation. Default: `0`. |
+| `distance_cache_size` | LRU cache size for pairwise distance-like values used in SMO steps. If `0`, values are stored in triangular matrices after first calculation. Default: `0`. |
+| `max_iter` | Maximum number of SMO iterations. Use `-1` for no hard iteration limit. Default: `-1`. |
+| `random_seed` | Random generator seed used for repeatable initialization in tests and experiments. Default: `None`. |
+| `logging_file_name` | Optional log file name. Use `None` to disable logging, `'uuid'` for a generated UUID-based filename, or `'time'` for a timestamp-based filename. Default: `None`. |
+
+### Algorithms
+
+- `alg='best_step_2d'`: the default SMO variant. It selects the most violating pair and may apply a two-dimensional update when both original and privileged coefficient-pair conditions are involved.
+- `alg='best_step'`: selects the most violating alpha or delta pair and performs a one-dimensional update.
+- `alg='delta_pair'`: prioritizes delta-pair updates and then alpha-pair updates; this option is usually slower.
+- `alg='cvxopt'`: uses the general-purpose CVXOPT quadratic-programming solver. It is intended mainly for comparison and testing, not for large-scale runs.
+
+### Attributes
+
+| Attribute | Description |
+| --- | --- |
+| `alphas_` | Dual coefficients `alpha_i`. |
+| `deltas_` | Dual coefficients `delta_i`. |
+| `rho_` | Decision-function intercept. |
+| `b_star_` | Correcting-function intercept. |
+| `alpha_support_` | Indices of training examples with `alpha_i > 0`. |
+| `delta_support_` | Indices of training examples with `0 < delta_i < 1`. |
+| `fit_status_` | `True` when the fitted model has the support structure needed to compute the standard intercepts from non-bound coefficients. If it is `False`, consider decreasing `tau` and/or increasing `max_iter`. |
+
+### Methods
+
+| Method | Description |
+| --- | --- |
+| `fit(Xall, y=None)` | Fits the model. `Xall` has shape `(n_samples, n_features + n_features_star)`. The first `n_features` columns are original features; the remaining columns are privileged features. `y` is ignored and is accepted only for scikit-learn compatibility. |
+| `decision_function(X)` | Returns signed distances in the original feature space. Positive values correspond to inliers and negative values to outliers. If `X` has extra columns, only the first `n_features` columns are used. |
+| `predict(X)` | Returns `+1` for inliers and `-1` for outliers. |
+| `correcting_function(X_star)` | Returns the values of the training-time correcting function in the privileged feature space. If `X_star` has extra columns, only the last `n_features_star` columns are used. |
+
+## Experiments notebook
+
+The exploratory notebook `experiments.ipynb` contains the synthetic example, hyperparameter studies, Shuttle data experiments, and comparisons with CVXOPT.
+The current API selects the solver through the `alg` parameter: use `alg='best_step_2d'` for the default SMO solver and `alg='cvxopt'` for the CVXOPT comparison solver.
+
+The notebook also expects external experiment files such as `shuttle.mat` and generated pickle files for cached results.
+
+## Citation
+
+If you use this code or the OCSVM+ algorithm in academic work, please cite:
+
+```bibtex
+@ARTICLE{10314493,
+  author={Lange, Andrey and Smolyakov, Dmitry and Burnaev, Evgeny},
+  journal={IEEE Access}, 
+  title={Sequential Minimal Optimization Algorithm for One-Class Support Vector Machines With Privileged Information}, 
+  year={2023},
+  volume={11},
+  number={},
+  pages={128106-128124},
+  keywords={Support vector machines;Kernel;Optimization;Training;Data models;Predictive models;Task analysis;Anomaly detection;Knowledge transfer;Information analysis;Anomaly detection;kernel methods;knowledge transfer;LUPI;one-class SVM;privileged information;sequential minimal optimization;SMO;support vector machines;SVM+},
+  doi={10.1109/ACCESS.2023.3331685}}
+```
+
+## Third-party software
+
+This project uses the STLCACHE library for caching kernel-function values.
+Many thanks to the STLCACHE authors: https://github.com/akashihi/stlcache
+
+When vendoring STLCACHE into this repository, keep the C++ headers under the `stlcache/` directory, because `stlcache.pxd` refers to `stlcache/stlcache.hpp`.
